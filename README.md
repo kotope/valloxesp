@@ -8,8 +8,8 @@ Thanks for original vallox libary implementation by dirtyha:
 https://github.com/dirtyha/my-esp8266/tree/master/Vallox
 
 Tested and verified with:
-Vallox 121 SE (version without front heating module)
-Vallox 121 SE (version with front heating)
+- Vallox 121 SE (version without front heating module)
+- Vallox 121 SE (version with front heating)
 
 # Home Assistant custom_component (ha_integration)
 Contains two entities: climate and binary_sensor
