@@ -1,0 +1,9 @@
+{
+    "domain": "vallox_mqtt",
+    "name": "vallox_mqtt",
+    "documentation": "",
+    "dependencies": ["mqtt"],
+    "codeowners": ["toni korhonen"],
+    "requirements": []
+}
+

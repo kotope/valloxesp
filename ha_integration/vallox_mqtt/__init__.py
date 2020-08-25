@@ -1,0 +1,1 @@
+"""vallox2mqtt"""
