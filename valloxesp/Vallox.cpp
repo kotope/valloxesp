@@ -710,8 +710,7 @@ boolean Vallox::isStatusInitDone() {
   return data.t_outside.lastReceived &&
     data.t_inside.lastReceived &&
     data.t_exhaust.lastReceived &&
-    data.t_incoming.lastReceived &&
-    data.rh.lastReceived;
+    data.t_incoming.lastReceived;
 }
 
 boolean Vallox::isConfigInitDone() { // all initializations
