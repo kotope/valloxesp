@@ -172,8 +172,14 @@ void publishState() {
   root["rh_mode"] = vx.isRhMode();
   root["filter"] = vx.isFilter();
   root["service_needed"] = vx.isServiceNeeded();
+  
   root["summer_mode"] = vx.isSummerMode();
-
+  // root["error_relay"] = vx.isErrorRelay();
+  root["motor_in"] = !vx.isMotorIn();
+  root["motor_out"] = !vx.isMotorOut();
+  root["front_heating"] = vx.isFrontHeating();
+  root["extra_func"] = vx.isExtraFunc();
+ 
   // Int values
   root["speed"] = vx.getFanSpeed();
   root["default_fan_speed"] = vx.getDefaultFanSpeed();

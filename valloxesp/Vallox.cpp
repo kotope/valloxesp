@@ -274,6 +274,27 @@ boolean Vallox::isSummerMode() {
   return data.is_summer_mode.value;
 }
 
+boolean Vallox::isErrorRelay() {
+  return data.is_error.value;
+}
+
+boolean Vallox::isMotorIn() {
+  return data.is_in_motor.value;  
+}
+
+boolean Vallox::isFrontHeating() {
+  return data.is_front_heating.value;
+}
+
+boolean Vallox::isMotorOut() {
+  return data.is_out_motor.value;
+}
+
+boolean Vallox::isExtraFunc() {
+  return data.is_extra_func.value;  
+}
+
+
 boolean Vallox::isFilter() {
   return data.is_filter.value;
 }
@@ -500,8 +521,7 @@ void Vallox::decodeMessage(const byte message[]) {
   } else if (variable == VX_VARIABLE_STATUS) {
     decodeStatus(value);
   } else if (variable == VX_VARIABLE_IO_08) {
-    data.is_summer_mode.lastReceived = millis();
-    checkConfigChange(&(data.is_summer_mode.value), (value & 0x02) != 0x00);
+    decodeVariable08(value);
   } else if (variable == VX_VARIABLE_SERVICE_PERIOD) {
     data.service_period.lastReceived = millis();
     checkConfigChange(&(data.service_period.value), value);
@@ -521,6 +541,29 @@ void Vallox::decodeMessage(const byte message[]) {
       settingsChangedCallback(); // Inform only when full init is done to avoid non-set variables being presented
     }
   }
+}
+
+// For now, read only (no mutex needed)
+void Vallox::decodeVariable08(byte variable08) {
+  // flags of variable 08
+  unsigned long now = millis();
+
+  data.is_summer_mode.lastReceived = now;
+  data.is_error.lastReceived = now;
+  data.is_in_motor.lastReceived = now;
+  data.is_front_heating.lastReceived = now;
+  data.is_out_motor.lastReceived = now;
+  data.is_extra_func.lastReceived = now;
+
+  data.variable08.value = variable08;
+  data.variable08.lastReceived = now;
+ 
+  checkConfigChange(&(data.is_summer_mode.value), (variable08 & VX_08_FLAG_SUMMER_MODE) != 0x00);
+  checkConfigChange(&(data.is_error.value), (variable08 & VX_08_FLAG_ERROR_RELAY) != 0x00);
+  checkConfigChange(&(data.is_in_motor.value), (variable08 & VX_08_FLAG_MOTOR_IN) != 0x00);
+  checkConfigChange(&(data.is_front_heating.value), (variable08 & VX_08_FLAG_FRONT_HEATING) != 0x00);
+  checkConfigChange(&(data.is_out_motor.value), (variable08 & VX_08_FLAG_MOTOR_OUT) != 0x00);
+  checkConfigChange(&(data.is_extra_func.value), (variable08 & VX_08_FLAG_EXTRA_FUNC) != 0x00);
 }
 
 
@@ -698,7 +741,7 @@ void Vallox::retryLoop() {
 
 void Vallox::sendMissingRequests() {
   if (!data.is_on.lastReceived) sendStatusReq();
-  if (!data.is_summer_mode.lastReceived) sendIO08Req();
+  if (!data.variable08.lastReceived) sendIO08Req();
   if (!data.fan_speed.lastReceived) sendFanSpeedReq();
   if (!data.default_fan_speed.lastReceived) sendDefaultFanSpeedReq();
   if (!data.service_period.lastReceived) sendServicePeriodReq();
@@ -719,7 +762,7 @@ boolean Vallox::isConfigInitDone() { // all initializations
     data.is_on.lastReceived &&
     data.is_rh_mode.lastReceived &&
     data.is_heating_mode.lastReceived &&
-    data.is_summer_mode.lastReceived &&
+    data.variable08.lastReceived &&
     data.is_filter.lastReceived &&
     data.is_heating.lastReceived &&
     data.is_fault.lastReceived &&

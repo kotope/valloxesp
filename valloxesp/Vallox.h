@@ -45,7 +45,12 @@
 #define VX_STATUS_FLAG_SERVICE 0x80         // bit 7 read       
 
 // flags of variable 08
-
+#define VX_08_FLAG_SUMMER_MODE 0x02
+#define VX_08_FLAG_ERROR_RELAY 0x04
+#define VX_08_FLAG_MOTOR_IN 0x08
+#define VX_08_FLAG_FRONT_HEATING 0x10
+#define VX_08_FLAG_MOTOR_OUT 0x20
+#define VX_08_FLAG_EXTRA_FUNC 0x40 // fireplace/boost switch
 
 // fan speeds
 #define VX_FAN_SPEED_1 0x01
@@ -103,6 +108,11 @@ class Vallox {
     boolean isRhMode();
     boolean isHeatingMode();
     boolean isSummerMode();
+    boolean isErrorRelay();
+    boolean isMotorIn();
+    boolean isFrontHeating();
+    boolean isMotorOut();
+    boolean isExtraFunc();
     boolean isFilter();
     boolean isHeating();
     boolean isFault();
@@ -157,7 +167,6 @@ class Vallox {
       booleanValue is_on;
       booleanValue is_rh_mode;
       booleanValue is_heating_mode;
-      booleanValue is_summer_mode;
       booleanValue is_filter;
       booleanValue is_heating;
       booleanValue is_fault;
@@ -168,6 +177,14 @@ class Vallox {
       intValue t_exhaust;
       intValue t_incoming;
 
+      // 08 variables
+      booleanValue is_summer_mode;
+      booleanValue is_error;
+      booleanValue is_in_motor;
+      booleanValue is_front_heating;
+      booleanValue is_out_motor;
+      booleanValue is_extra_func;
+   
       intValue fan_speed;
       intValue default_fan_speed;
       intValue rh;
@@ -175,7 +192,8 @@ class Vallox {
       intValue service_counter;
       intValue heating_target;
 
-      intValue status;
+      intValue status; // full status message
+      intValue variable08; // full 08 message
     } data;
 
     PACKET_CALLBACK_SIGNATURE {nullptr};
@@ -223,6 +241,8 @@ class Vallox {
     boolean readMessage(byte message[]);
     void decodeMessage(const byte message[]);
     void decodeStatus(byte status);
+    void decodeVariable08(byte variable08);
+
 
     // helpers
     unsigned long checkChange(boolean* oldValue, boolean newValue);
