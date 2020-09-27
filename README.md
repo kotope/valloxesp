@@ -59,3 +59,7 @@ exposed attributes by binary_sensor:
 - temp_incoming
 - temp_exhaust
 - rh
+- motor_in (read only)
+- motor_out (read only)
+- extra_func (read only)
+- front_heating (read only)
