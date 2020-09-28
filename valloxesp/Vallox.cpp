@@ -5,7 +5,7 @@
 #include "Vallox.h"
 
 // VX fan speed (1-8) conversion table
-const int8_t vxFanSpeeds[] = {
+const uint8_t vxFanSpeeds[] = {
   VX_FAN_SPEED_1, 
   VX_FAN_SPEED_2, 
   VX_FAN_SPEED_3, 
