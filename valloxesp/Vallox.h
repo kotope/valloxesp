@@ -33,6 +33,9 @@
 #define VX_VARIABLE_IO_08 0x08
 #define VX_VARIABLE_HEATING_TARGET 0xA4
 #define VX_VARIABLE_FAULT_CODE 0x36 // TODO: Not implemented yet
+#define VX_VARIABLE_FLAGS_06 0x71
+#define VX_VARIABLE_HEATING_STATUS 0x07 // TODO: Not yet implemented
+#define VX_VARIABLE_PROGRAM 0xAA
 
 // status flags of variable A3
 #define VX_STATUS_FLAG_POWER 0x01           // bit 0 read/write
@@ -50,7 +53,22 @@
 #define VX_08_FLAG_MOTOR_IN 0x08
 #define VX_08_FLAG_FRONT_HEATING 0x10
 #define VX_08_FLAG_MOTOR_OUT 0x20
-#define VX_08_FLAG_EXTRA_FUNC 0x40 // fireplace/boost switch
+#define VX_08_FLAG_EXTRA_FUNC 0x40 // fireplace/boost switch. Does not work properly?
+
+// boost/fireplace
+#define VX_EXTRA_FUNC_COUNTER 0x79 // remaining time in minutes
+
+// Variable Flags 06
+
+// flags of variable 06
+#define VX_06_FIREPLACE_FLAG_ACTIVATE 0x10 // read and set
+#define VX_06_FIREPLACE_FLAG_IS_ACTIVE 0x20 // 0 = not active, 1 = active
+
+// flags program variable
+#define VX_PROGRAM_SWITCH_TYPE 0x20
+
+// program variable
+#define PROGRAM_VARIABLE_BOOST 0x10 // boost = 0, fireplace = 1
 
 // fan speeds
 #define VX_FAN_SPEED_1 0x01
@@ -66,8 +84,10 @@
 
 #define DEBUG_PRINT_CALLBACK_SIGNATURE std::function<void(String debugPrint)> debugPrintCallback
 #define PACKET_CALLBACK_SIGNATURE std::function<void(byte* packet, unsigned int length, char* packetDirection)> packetCallback
-#define SETTINGS_CHANGED_CALLBACK_SIGNATURE std::function<void()> settingsChangedCallback
 #define STATUS_CHANGED_CALLBACK_SIGNATURE std::function<void()> statusChangedCallback
+#define TEMPERATURE_CHANGED_CALLBACK_SIGNATURE std::function<void()> temperatureChangedCallback
+#define SETTINGS_CHANGED_CALLBACK_SIGNATURE std::function<void()> settingsChangedCallback
+
 
 
 struct intValue {
@@ -100,10 +120,12 @@ class Vallox {
 
     // get data from cache
     unsigned long getUpdated(); // time when data was last updated
+    
     int getInsideTemp();
     int getOutsideTemp();
     int getIncomingTemp();
     int getExhaustTemp();
+
     boolean isOn();
     boolean isRhMode();
     boolean isHeatingMode();
@@ -117,6 +139,7 @@ class Vallox {
     boolean isHeating();
     boolean isFault();
     boolean isServiceNeeded();
+    
     int getFanSpeed();
     int getDefaultFanSpeed();
     int getRh();
@@ -124,6 +147,9 @@ class Vallox {
     int getServiceCounter();
     int getHeatingTarget();
 
+    // get data from cache (settings)
+    int getSwitchType(); // (0 = fireplace, 1 = boost, NOT_SET = null)
+    
     // set data in Vallox bus
     void setFanSpeed(int speed);
     void setDefaultFanSpeed(int speed);
@@ -137,14 +163,17 @@ class Vallox {
     void setServiceCounter(int months);
     void setHeatingTarget(int temp);
 
+    void setSwitchOn(); // Sets boost/fireplace on
+    
     void setDebug(bool debug);
     boolean isInitOk();
 
     // Callback
     void setDebugPrintCallback(DEBUG_PRINT_CALLBACK_SIGNATURE);
     void setPacketCallback(PACKET_CALLBACK_SIGNATURE);
-    void setSettingsChangedCallback(SETTINGS_CHANGED_CALLBACK_SIGNATURE);
     void setStatusChangedCallback(STATUS_CHANGED_CALLBACK_SIGNATURE);
+    void setTemperatureChangedCallback(TEMPERATURE_CHANGED_CALLBACK_SIGNATURE);
+    void setSettingsChangedCallback(SETTINGS_CHANGED_CALLBACK_SIGNATURE);
 
     
   private:
@@ -159,19 +188,23 @@ class Vallox {
 
     // lock status (prevent sending and overriding different values until we have received the last)
     boolean statusMutex = false;
+
+    // lock program variable (prevent sending and overriding different values until we have received the last)
+    boolean programMutex = false;
     
-    // data cache
+    // Status data cache
     struct {
       unsigned long updated;
 
       booleanValue is_on;
-      booleanValue is_rh_mode;
+      booleanValue is_rh_mode; // TODO: Settings
       booleanValue is_heating_mode;
       booleanValue is_filter;
       booleanValue is_heating;
       booleanValue is_fault;
       booleanValue is_service;
 
+      // TODO: Move to temperature struct
       intValue t_outside;
       intValue t_inside;
       intValue t_exhaust;
@@ -192,14 +225,25 @@ class Vallox {
       intValue service_counter;
       intValue heating_target;
 
+      // full byte messages
       intValue status; // full status message
       intValue variable08; // full 08 message
+      intValue flags06; // full flags 06 message
     } data;
 
+    // Settings data cache
+    struct { 
+      // 06 variables
+      booleanValue is_boost_setting; // boost (1) or fireplace (0)
+     
+      intValue program; // full program (0xAA) message
+    } settings;
+    
     PACKET_CALLBACK_SIGNATURE {nullptr};
-    SETTINGS_CHANGED_CALLBACK_SIGNATURE {nullptr};
+    STATUS_CHANGED_CALLBACK_SIGNATURE {nullptr};
     DEBUG_PRINT_CALLBACK_SIGNATURE {nullptr};
-    STATUS_CHANGED_CALLBACK_SIGNATURE { nullptr };
+    TEMPERATURE_CHANGED_CALLBACK_SIGNATURE { nullptr };
+    SETTINGS_CHANGED_CALLBACK_SIGNATURE { nullptr };
 
     // Status setter
     boolean setStatusVariable(byte variable, byte value);
@@ -211,6 +255,7 @@ class Vallox {
     // requests
     void sendStatusReq();
     void sendIO08Req();
+    void sendFlags06Req();
     void sendInsideTempReq();
     void sendOutsideTempReq();
     void sendIncomingTempReq();
@@ -221,6 +266,7 @@ class Vallox {
     void sendHeatingTargetReq();
     void sendRhReq();
     void sendServiceCounterReq();
+    void sendProgramReq();
 
     // error handling
     void retryLoop();
@@ -242,6 +288,8 @@ class Vallox {
     void decodeMessage(const byte message[]);
     void decodeStatus(byte status);
     void decodeVariable08(byte variable08);
+    void decodeFlags06(byte flags06);
+    void decodeProgram(byte program);
 
 
     // helpers
@@ -249,16 +297,17 @@ class Vallox {
     unsigned long checkChange(int* oldValue, int newValue);
     static byte calculateCheckSum(const byte message[]);
     bool validateCheckSum(const byte message[]);
+
+    bool isStatusInitDone(); // Checks that all init poll requests has been done
+    bool isTemperatureInitDone(); // Checks that all temperature values has been received at once
     
-    bool isConfigInitDone(); // Checks that all init poll requests has been done
-    bool isStatusInitDone();
-    
-    void checkConfigChange(boolean* oldValue, boolean newValue);
-    void checkConfigChange(int* oldValue, int newValue);
-    
+    void checkStatusChange(boolean* oldValue, boolean newValue);
     void checkStatusChange(int* oldValue, int newValue);
+    
+    void checkTemperatureChange(int* oldValue, int newValue);
     boolean checkTemperatureChange(int *oldValue, int newValue, unsigned long* lastReceived);
 
+    void checkSettingsChange(boolean* oldValue, boolean newValue);
 };
 
 #endif

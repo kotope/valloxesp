@@ -31,9 +31,10 @@ void setup() {
   initOTA();
 
   vx.setPacketCallback(packetDebug);
-  vx.setSettingsChangedCallback(settingsChanged);
-  vx.setDebugPrintCallback(debugPrint);
   vx.setStatusChangedCallback(statusChanged);
+  vx.setDebugPrintCallback(debugPrint);
+  vx.setTemperatureChangedCallback(temperatureChanged);
+  vx.setSettingsChangedCallback(settingsChanged);
   
   vx.connect(&Serial);
 
@@ -210,12 +211,31 @@ void publishTemperatures() {
   client.endPublish();
 }
 
-void settingsChanged() {
-  publishState();
+void publishSettings() {
+  DynamicJsonDocument root(JSON_BUFFER_LENGTH);
+
+  if (vx.getSwitchType() == -NOT_SET) {
+    return; // ignore, no settings to be publishd
+  }
+
+  root["switch_type"] = vx.getSwitchType() == 1 ? "boost" : "fireplace";
+  String mqttOutput;
+  serializeJson(root, mqttOutput);
+  client.beginPublish(vallox_settings_topic, mqttOutput.length(), true); // different topic
+  client.print(mqttOutput);
+  client.endPublish();
 }
 
 void statusChanged() {
+  publishState();
+}
+
+void temperatureChanged() {
   publishTemperatures();
+}
+
+void settingsChanged() {
+  publishSettings();
 }
 
 void debugPrint(String message) {
