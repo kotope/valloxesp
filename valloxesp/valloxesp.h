@@ -19,4 +19,4 @@ const char* vallox_temp_topic         = "vallox/temp"; // temperature topic
 const char* vallox_set_topic          = "vallox/set"; // set topic
 const char* vallox_state_topic        = "vallox/state"; // dynamically updatig values (on/off, temp, etc ...)
 const char* vallox_debug_topic        = "vallox/debug"; // debug topic
-
+const char* vallox_settings_topic     = "vallox/settings"; // settings topic

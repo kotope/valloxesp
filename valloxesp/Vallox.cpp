@@ -77,6 +77,9 @@ void Vallox::requestConfig() {
   sendServiceCounterReq();
   sendHeatingTargetReq();
 
+  sendFlags06Req();
+  sendProgramReq();
+  
   // Temperature values are not needed to request, they are updated automatically
 
   // Set request time for all configurations
@@ -99,7 +102,7 @@ void Vallox::loop() {
   if(now - lastRequested > QUERY_INTERVAL) {
     lastRequested = now;
 
-    if (isConfigInitDone()) { 
+    if (isStatusInitDone()) { 
       sendIO08Req();
       sendServiceCounterReq();
     }
@@ -116,7 +119,7 @@ void Vallox::setFanSpeed(int speed) {
   if (speed <= VX_MAX_FAN_SPEED) {
     setVariable(VX_VARIABLE_FAN_SPEED, fanSpeed2Hex(speed));
     data.fan_speed.value = speed;
-    settingsChangedCallback();
+    statusChangedCallback();
   }
 }
 
@@ -124,7 +127,7 @@ void Vallox::setDefaultFanSpeed(int speed) {
   if (speed < VX_MAX_FAN_SPEED) {
     setVariable(VX_VARIABLE_DEFAULT_FAN_SPEED, fanSpeed2Hex(speed));
     data.default_fan_speed.value = speed;
-    settingsChangedCallback();
+    statusChangedCallback();
   }
 }
 
@@ -133,42 +136,42 @@ void Vallox::setOn() {
 
   if (setStatusVariable(VX_VARIABLE_STATUS, data.status.value | VX_STATUS_FLAG_POWER)) {
     data.is_on.value = true;
-    settingsChangedCallback();
+    statusChangedCallback();
   }
 }
 
 void Vallox::setOff() {
   if (setStatusVariable(VX_VARIABLE_STATUS, data.status.value & ~VX_STATUS_FLAG_POWER)) {
     data.is_on.value = false;
-    settingsChangedCallback();
+    statusChangedCallback();
   }
 }
 
 void Vallox::setRhModeOn() {
   if(setStatusVariable(VX_VARIABLE_STATUS, data.status.value | VX_STATUS_FLAG_RH)) {
     data.is_rh_mode.value = true;
-    settingsChangedCallback();
+    statusChangedCallback();
   }
 }
 
 void Vallox::setRhModeOff() {
   if (setStatusVariable(VX_VARIABLE_STATUS, data.status.value & ~VX_STATUS_FLAG_RH)) {
     data.is_rh_mode.value = false;
-    settingsChangedCallback();
+    statusChangedCallback();
   }
 }
 
 void Vallox::setHeatingModeOn() {
   if (setStatusVariable(VX_VARIABLE_STATUS, data.status.value | VX_STATUS_FLAG_HEATING_MODE)) {
     data.is_heating_mode.value = true;
-    settingsChangedCallback();
+    statusChangedCallback();
   }
 }
 
 void Vallox::setHeatingModeOff() {
   if (setStatusVariable(VX_VARIABLE_STATUS, data.status.value & ~VX_STATUS_FLAG_HEATING_MODE)) {
     data.is_heating_mode.value = false;
-    settingsChangedCallback();
+    statusChangedCallback();
   }
 }
 
@@ -190,7 +193,7 @@ void Vallox::setServicePeriod(int months) {
   if (months >= 0 && months < 256) {
     setVariable(VX_VARIABLE_SERVICE_PERIOD, months);
     data.service_period.value = months;
-    settingsChangedCallback();
+    statusChangedCallback();
   }
 }
 
@@ -198,7 +201,7 @@ void Vallox::setServiceCounter(int months) {
   if (months >= 0 && months < 256) {
     setVariable(VX_VARIABLE_SERVICE_COUNTER, months);
     data.service_counter.value = months;
-    settingsChangedCallback();
+    statusChangedCallback();
   }
 }
 
@@ -207,13 +210,18 @@ void Vallox::setHeatingTarget(int cel) {
     byte hex = cel2Ntc(cel);
     setVariable(VX_VARIABLE_HEATING_TARGET, hex);
     data.heating_target.value = cel;
-    settingsChangedCallback();
+    statusChangedCallback();
   }
+}
+
+void Vallox::setSwitchOn() {
+  // Sets boost/fireplace switch on
+  
 }
 
 void Vallox::setDebug(bool debug) {
   isDebug = debug;
-  settingsChangedCallback();
+  statusChangedCallback();
 }
 
 boolean Vallox::isInitOk() {
@@ -225,16 +233,20 @@ void Vallox::setPacketCallback(PACKET_CALLBACK_SIGNATURE) {
   this->packetCallback = packetCallback;
 }
 
-void Vallox::setSettingsChangedCallback(SETTINGS_CHANGED_CALLBACK_SIGNATURE) {
-  this->settingsChangedCallback = settingsChangedCallback;
+void Vallox::setStatusChangedCallback(STATUS_CHANGED_CALLBACK_SIGNATURE) {
+  this->statusChangedCallback = statusChangedCallback;
 }
 
 void Vallox::setDebugPrintCallback(DEBUG_PRINT_CALLBACK_SIGNATURE) {
   this->debugPrintCallback = debugPrintCallback;
 }
 
-void Vallox::setStatusChangedCallback(STATUS_CHANGED_CALLBACK_SIGNATURE) {
-  this->statusChangedCallback = statusChangedCallback;
+void Vallox::setTemperatureChangedCallback(TEMPERATURE_CHANGED_CALLBACK_SIGNATURE) {
+  this->temperatureChangedCallback = temperatureChangedCallback;
+}
+
+void Vallox::setSettingsChangedCallback(SETTINGS_CHANGED_CALLBACK_SIGNATURE) {
+  this->settingsChangedCallback = settingsChangedCallback;
 }
 
 // Getters
@@ -335,6 +347,13 @@ int Vallox::getHeatingTarget() {
   return data.heating_target.value;
 }
 
+int Vallox::getSwitchType() {
+  if (!settings.is_boost_setting.lastReceived) {
+    return NOT_SET;
+  }
+  return settings.is_boost_setting.value ? 1 : 0;
+}
+
 // private
 
 // Requests
@@ -376,6 +395,14 @@ void Vallox::sendHeatingTargetReq() {
 
 void Vallox::sendIO08Req() {
   requestVariable(VX_VARIABLE_IO_08);
+}
+
+void Vallox::sendFlags06Req() {
+  requestVariable(VX_VARIABLE_FLAGS_06);
+}
+
+void Vallox::sendProgramReq() {
+  requestVariable(VX_VARIABLE_PROGRAM);
 }
 
 void Vallox::sendServiceCounterReq() {
@@ -514,31 +541,35 @@ void Vallox::decodeMessage(const byte message[]) {
   // Others (config object)
   else if (variable == VX_VARIABLE_FAN_SPEED) {
     data.fan_speed.lastReceived = millis();
-    checkConfigChange(&(data.fan_speed.value), hex2FanSpeed(value));
+    checkStatusChange(&(data.fan_speed.value), hex2FanSpeed(value));
   } else if (variable == VX_VARIABLE_DEFAULT_FAN_SPEED) {
     data.default_fan_speed.lastReceived = millis();
-    checkConfigChange(&(data.default_fan_speed.value), hex2FanSpeed(value));
+    checkStatusChange(&(data.default_fan_speed.value), hex2FanSpeed(value));
   } else if (variable == VX_VARIABLE_STATUS) {
     decodeStatus(value);
   } else if (variable == VX_VARIABLE_IO_08) {
     decodeVariable08(value);
+  } else if (variable == VX_VARIABLE_FLAGS_06) {
+    decodeFlags06(value);
   } else if (variable == VX_VARIABLE_SERVICE_PERIOD) {
     data.service_period.lastReceived = millis();
-    checkConfigChange(&(data.service_period.value), value);
+    checkStatusChange(&(data.service_period.value), value);
   } else if (variable == VX_VARIABLE_SERVICE_COUNTER) {
     data.service_counter.lastReceived = millis();
-    checkConfigChange(&(data.service_counter.value), value);
+    checkStatusChange(&(data.service_counter.value), value);
   } else if (variable == VX_VARIABLE_HEATING_TARGET) {
     data.heating_target.lastReceived = millis();
-    checkConfigChange(&(data.heating_target.value), ntc2Cel(value));
+    checkStatusChange(&(data.heating_target.value), ntc2Cel(value));
+  } else if (variable == VX_VARIABLE_PROGRAM) {
+     decodeProgram(value);
   } else {
     // variable not recognized
   }
 
   if (!fullInitDone) { // Only send once after all the decoding has been successfully done
-    fullInitDone = isConfigInitDone();
+    fullInitDone = isStatusInitDone();
     if (fullInitDone) {
-      settingsChangedCallback(); // Inform only when full init is done to avoid non-set variables being presented
+      statusChangedCallback(); // Inform only when full init is done to avoid non-set variables being presented
     }
   }
 }
@@ -558,14 +589,40 @@ void Vallox::decodeVariable08(byte variable08) {
   data.variable08.value = variable08;
   data.variable08.lastReceived = now;
  
-  checkConfigChange(&(data.is_summer_mode.value), (variable08 & VX_08_FLAG_SUMMER_MODE) != 0x00);
-  checkConfigChange(&(data.is_error.value), (variable08 & VX_08_FLAG_ERROR_RELAY) != 0x00);
-  checkConfigChange(&(data.is_in_motor.value), (variable08 & VX_08_FLAG_MOTOR_IN) != 0x00);
-  checkConfigChange(&(data.is_front_heating.value), (variable08 & VX_08_FLAG_FRONT_HEATING) != 0x00);
-  checkConfigChange(&(data.is_out_motor.value), (variable08 & VX_08_FLAG_MOTOR_OUT) != 0x00);
-  checkConfigChange(&(data.is_extra_func.value), (variable08 & VX_08_FLAG_EXTRA_FUNC) != 0x00);
+  checkStatusChange(&(data.is_summer_mode.value), (variable08 & VX_08_FLAG_SUMMER_MODE) != 0x00);
+  checkStatusChange(&(data.is_error.value), (variable08 & VX_08_FLAG_ERROR_RELAY) != 0x00);
+  checkStatusChange(&(data.is_in_motor.value), (variable08 & VX_08_FLAG_MOTOR_IN) != 0x00);
+  checkStatusChange(&(data.is_front_heating.value), (variable08 & VX_08_FLAG_FRONT_HEATING) != 0x00);
+  checkStatusChange(&(data.is_out_motor.value), (variable08 & VX_08_FLAG_MOTOR_OUT) != 0x00);
+  checkStatusChange(&(data.is_extra_func.value), (variable08 & VX_08_FLAG_EXTRA_FUNC) != 0x00);
 }
 
+// For now, read only (no mutex needed)
+void Vallox::decodeFlags06(byte flags06) {
+  // flags of variable 06
+  unsigned long now = millis();
+
+  data.flags06.value = flags06;
+  data.flags06.lastReceived = now;
+}
+
+void Vallox::decodeProgram(byte program) {
+  // flags of programs variable
+  bool shoudInformCallback = !settings.is_boost_setting.lastReceived;
+  
+  unsigned long now = millis();
+  settings.is_boost_setting.lastReceived = now;
+
+  settings.program.value = program;
+  settings.program.lastReceived = now;
+
+  checkSettingsChange(&(settings.is_boost_setting.value), (program & VX_PROGRAM_SWITCH_TYPE) != 0x00);
+
+  if (shoudInformCallback) {
+    // Never received, publish
+    settingsChangedCallback();
+  }
+}
 
 void Vallox::decodeStatus(byte status) {
   unsigned long now = millis();
@@ -581,44 +638,52 @@ void Vallox::decodeStatus(byte status) {
   data.status.value = status; // This is the full data status
   data.status.lastReceived = now;
   
-  checkConfigChange(&(data.is_on.value), (status & VX_STATUS_FLAG_POWER) != 0x00);
-  checkConfigChange(&(data.is_rh_mode.value), (status & VX_STATUS_FLAG_RH) != 0x00);
-  checkConfigChange(&(data.is_heating_mode.value), (status & VX_STATUS_FLAG_HEATING_MODE) != 0x00);
-  checkConfigChange(&(data.is_filter.value), (status & VX_STATUS_FLAG_FILTER) != 0x00);
-  checkConfigChange(&(data.is_heating.value), (status & VX_STATUS_FLAG_HEATING) != 0x00);
-  checkConfigChange(&(data.is_fault.value), (status & VX_STATUS_FLAG_FAULT) != 0x00);
-  checkConfigChange(&(data.is_service.value), (status & VX_STATUS_FLAG_SERVICE) != 0x00);
+  checkStatusChange(&(data.is_on.value), (status & VX_STATUS_FLAG_POWER) != 0x00);
+  checkStatusChange(&(data.is_rh_mode.value), (status & VX_STATUS_FLAG_RH) != 0x00);
+  checkStatusChange(&(data.is_heating_mode.value), (status & VX_STATUS_FLAG_HEATING_MODE) != 0x00);
+  checkStatusChange(&(data.is_filter.value), (status & VX_STATUS_FLAG_FILTER) != 0x00);
+  checkStatusChange(&(data.is_heating.value), (status & VX_STATUS_FLAG_HEATING) != 0x00);
+  checkStatusChange(&(data.is_fault.value), (status & VX_STATUS_FLAG_FAULT) != 0x00);
+  checkStatusChange(&(data.is_service.value), (status & VX_STATUS_FLAG_SERVICE) != 0x00);
 
   statusMutex = false; // Clear the status mutex, allow to continue
 }
 
-// Status
-void Vallox::checkConfigChange(boolean* oldValue, boolean newValue) {
-  if (checkChange(oldValue, newValue) && fullInitDone) {
-    settingsChangedCallback();
+//
+// Settings
+void Vallox::checkSettingsChange(boolean* oldValue, boolean newValue) {
+  if (checkChange(oldValue, newValue)) {
+    statusChangedCallback();
   }
 }
 
+//
 // Status
-void Vallox::checkConfigChange(int* oldValue, int newValue) {
+void Vallox::checkStatusChange(boolean* oldValue, boolean newValue) {
   if (checkChange(oldValue, newValue) && fullInitDone) {
-    settingsChangedCallback();
+    statusChangedCallback();
   }
 }
 
-// Temp change
+void Vallox::checkStatusChange(int* oldValue, int newValue) {
+  if (checkChange(oldValue, newValue) && fullInitDone) {
+    statusChangedCallback();
+  }
+}
+
+//
+// Temperature change
 boolean Vallox::checkTemperatureChange(int *oldValue, int newValue, unsigned long *lastReceived) {
   unsigned long now = millis();
 
   *lastReceived = now;
-  checkStatusChange(oldValue, newValue);
+  checkTemperatureChange(oldValue, newValue);
   return true;
 }
 
-// Status change
-void Vallox::checkStatusChange(int* oldValue, int newValue) {
-  if (checkChange(oldValue, newValue) && isStatusInitDone()) { // Do not publish status, until base values has been received
-    statusChangedCallback();
+void Vallox::checkTemperatureChange(int* oldValue, int newValue) {
+  if (checkChange(oldValue, newValue) && isTemperatureInitDone()) { // Do not publish status, until base values has been received
+    temperatureChangedCallback();
   }
 }
 
@@ -749,14 +814,14 @@ void Vallox::sendMissingRequests() {
   if (!data.heating_target.lastReceived) sendHeatingTargetReq();
 }
 
-boolean Vallox::isStatusInitDone() {
+boolean Vallox::isTemperatureInitDone() {
   return data.t_outside.lastReceived &&
     data.t_inside.lastReceived &&
     data.t_exhaust.lastReceived &&
     data.t_incoming.lastReceived;
 }
 
-boolean Vallox::isConfigInitDone() { // all initializations
+boolean Vallox::isStatusInitDone() { // all initializations
   // Ensure that all data values has been received
   return 
     data.is_on.lastReceived &&
