@@ -11,7 +11,7 @@
 #include "Vallox.h"
 
 #define JSON_BUFFER_LENGTH 2048
-#define DEBUG false // default value for debug
+#define DEBUG true // default value for debug
 
 // Callbacks
 void mqttCallback(char* topic, byte* payload, unsigned int payloadLength);
@@ -34,7 +34,6 @@ void setup() {
   vx.setStatusChangedCallback(statusChanged);
   vx.setDebugPrintCallback(debugPrint);
   vx.setTemperatureChangedCallback(temperatureChanged);
-  vx.setSettingsChangedCallback(settingsChanged);
   
   vx.connect(&Serial);
 
@@ -125,7 +124,6 @@ void handleUpdate(byte * payload) {
     vx.setDebug(debug);
   }
 
-  // Do not let client set this off for security reasons
   if (d.containsKey("mode")) {
     String m = d["mode"];
     if (m == "FAN") {
@@ -147,16 +145,22 @@ void handleUpdate(byte * payload) {
   // I've disabled possibility to turn off the ventilation
   // If you wish to have such feature, feel free to implement :-)
 
+  // Speed
   if (d.containsKey("speed")) {
     int speed = d["speed"];
     vx.setFanSpeed(speed);
   }
-  
+
+  // Heat target
   if (d.containsKey("heat_target")) {
     int ht = d["heat_target"];
     vx.setHeatingTarget(ht);
   }
 
+  // Activate boost/fireplace
+  if (d.containsKey("activate_switch")) {
+    vx.setSwitchOn();
+  }
 }
 
 // State
@@ -187,6 +191,13 @@ void publishState() {
   root["service_period"] = vx.getServicePeriod();
   root["service_counter"] = vx.getServiceCounter();
   root["heat_target"] = vx.getHeatingTarget();  
+
+  root["switch_active"] = vx.isSwitchActive();
+
+  if (vx.getSwitchType() != NOT_SET) {
+    root["switch_type"] = vx.getSwitchType() == 1 ? "boost" : "fireplace";
+  }
+
   
   String mqttOutput;
   serializeJson(root, mqttOutput);
@@ -202,26 +213,13 @@ void publishTemperatures() {
   root["temp_inside"] = vx.getInsideTemp();
   root["temp_incoming"] = vx.getIncomingTemp();
   root["temp_exhaust"] = vx.getExhaustTemp();
+
+  // TODO: Make helper to publish only other than NOT_SET values
   root["rh"] = vx.getRh();
 
   String mqttOutput;
   serializeJson(root, mqttOutput);
   client.beginPublish(vallox_temp_topic, mqttOutput.length(), true);
-  client.print(mqttOutput);
-  client.endPublish();
-}
-
-void publishSettings() {
-  DynamicJsonDocument root(JSON_BUFFER_LENGTH);
-
-  if (vx.getSwitchType() == -NOT_SET) {
-    return; // ignore, no settings to be publishd
-  }
-
-  root["switch_type"] = vx.getSwitchType() == 1 ? "boost" : "fireplace";
-  String mqttOutput;
-  serializeJson(root, mqttOutput);
-  client.beginPublish(vallox_settings_topic, mqttOutput.length(), true); // different topic
   client.print(mqttOutput);
   client.endPublish();
 }
@@ -232,10 +230,6 @@ void statusChanged() {
 
 void temperatureChanged() {
   publishTemperatures();
-}
-
-void settingsChanged() {
-  publishSettings();
 }
 
 void debugPrint(String message) {

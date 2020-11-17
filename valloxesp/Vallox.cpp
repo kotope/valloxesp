@@ -215,8 +215,10 @@ void Vallox::setHeatingTarget(int cel) {
 }
 
 void Vallox::setSwitchOn() {
-  // Sets boost/fireplace switch on
+  // Activate boost/fireplace
+  // TODO: This seems to fail now ?
   
+  setVariable(VX_VARIABLE_FLAGS_06, data.flags06.value | VX_06_FIREPLACE_FLAG_ACTIVATE);
 }
 
 void Vallox::setDebug(bool debug) {
@@ -243,10 +245,6 @@ void Vallox::setDebugPrintCallback(DEBUG_PRINT_CALLBACK_SIGNATURE) {
 
 void Vallox::setTemperatureChangedCallback(TEMPERATURE_CHANGED_CALLBACK_SIGNATURE) {
   this->temperatureChangedCallback = temperatureChangedCallback;
-}
-
-void Vallox::setSettingsChangedCallback(SETTINGS_CHANGED_CALLBACK_SIGNATURE) {
-  this->settingsChangedCallback = settingsChangedCallback;
 }
 
 // Getters
@@ -280,6 +278,10 @@ boolean Vallox::isRhMode() {
 
 boolean Vallox::isHeatingMode() {
   return data.is_heating_mode.value;
+}
+
+boolean Vallox::isSwitchActive() {
+  return data.is_switch_active.value;  
 }
 
 boolean Vallox::isSummerMode() {
@@ -601,9 +603,12 @@ void Vallox::decodeVariable08(byte variable08) {
 void Vallox::decodeFlags06(byte flags06) {
   // flags of variable 06
   unsigned long now = millis();
+  data.is_switch_active.lastReceived = now;
 
   data.flags06.value = flags06;
   data.flags06.lastReceived = now;
+
+  checkStatusChange(&(data.is_switch_active.value), (flags06 & VX_06_FIREPLACE_FLAG_IS_ACTIVE) != 0x00);
 }
 
 void Vallox::decodeProgram(byte program) {
@@ -618,9 +623,10 @@ void Vallox::decodeProgram(byte program) {
 
   checkSettingsChange(&(settings.is_boost_setting.value), (program & VX_PROGRAM_SWITCH_TYPE) != 0x00);
 
+  // TODO: 
   if (shoudInformCallback) {
     // Never received, publish
-    settingsChangedCallback();
+    statusChangedCallback();
   }
 }
 
