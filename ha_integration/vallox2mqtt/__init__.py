@@ -146,6 +146,6 @@ class Vallox2mqtt():
 
     def _publish_switch_on(self):
         """Set fireplace/boost switch on."""
-        payload = '{"activate_switch"}'
+        payload = '{"activate_switch": true}'
         mqtt.async_publish(self._hass, self._command_topic, payload,
             self._qos, self._retain)
