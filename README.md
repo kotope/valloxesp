@@ -14,31 +14,26 @@ Tested and verified with:
 - Vallox 096 SE
 
 # Home Assistant custom_component (ha_integration)
-Contains two entities: climate and binary_sensor
+Contains three entities: climate, switch and binary_sensor
 Binary sensor has multiple read-only attributes while climate control only controls target temperature, fan speed and operation mode
+Switch is used to perform boost or fireplace function (depending which one you have selected from vallox configuration)
 
 configuration by configurations.yaml:
-climate:
-  - platform: vallox_mqtt
-    name: "Ventilation"
-    temperature_state_topic: "vallox/temp"
-    command_topic: "vallox/set"
-    state_topic: "vallox/state"
-
-binary_sensor:
-  - platform: vallox_mqtt
-    name: "Ventilation status"
-    temperature_state_topic: "vallox/temp"
-    command_topic: "vallox/set"
-    state_topic: "vallox/state"
+vallox2mqtt:
+  name: "Ventilation"
+  temperature_state_topic: "vallox/temp"
+  command_topic: "vallox/set"
+  state_topic: "vallox/state"
+﻿
 
 After those, you can create templated sensors like:
 sensor:
   - platform: template
     sensors:
-      vallox_filter_due:
-        value_template: "{{ states.binary_sensor.ventilation_status.attributes.filter }}"
-        friendly_name: Ventilation filter due
+      ventilation_outside_temp:
+        value_template: "{{ states.binary_sensor.ventilation.attributes.temp_outside }}"
+        friendly_name: Ventilation outside temperature
+        unit_of_measurement: "°C"
 
 exposed attributes by binary_sensor:
 - mode
@@ -63,3 +58,4 @@ exposed attributes by binary_sensor:
 - motor_out (read only)
 - extra_func (read only)
 - front_heating (read only)
+- switch_type
