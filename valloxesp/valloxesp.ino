@@ -214,8 +214,14 @@ void publishTemperatures() {
   root["temp_incoming"] = vx.getIncomingTemp();
   root["temp_exhaust"] = vx.getExhaustTemp();
 
-  // TODO: Make helper to publish only other than NOT_SET values
-  root["rh"] = vx.getRh();
+  // Publish only if RH values are something else than not set
+  if(vx.getRh1() != NOT_SET) {
+    root["rh_1"] = vx.getRh1();
+  }
+
+  if(vx.getRh2() != NOT_SET) {
+    root["rh_2"] = vx.getRh2();
+  }
 
   String mqttOutput;
   serializeJson(root, mqttOutput);

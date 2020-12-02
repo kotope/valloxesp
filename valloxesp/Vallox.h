@@ -79,14 +79,15 @@ class Vallox {
     
     int getFanSpeed();
     int getDefaultFanSpeed();
-    int getRh();
+    int getRh1();
+    int getRh2();
     int getServicePeriod();
     int getServiceCounter();
     int getHeatingTarget();
 
     // get data from cache (settings)
     int getSwitchType(); // (0 = fireplace, 1 = boost, NOT_SET = null)
-    
+
     // set data in Vallox bus
     void setFanSpeed(int speed);
     void setDefaultFanSpeed(int speed);
@@ -145,6 +146,10 @@ class Vallox {
       intValue t_exhaust;
       intValue t_incoming;
 
+      // RH
+      intValue rh1;
+      intValue rh2;
+
       // 08 variables
       booleanValue is_summer_mode;
       booleanValue is_error;
@@ -155,7 +160,7 @@ class Vallox {
    
       intValue fan_speed;
       intValue default_fan_speed;
-      intValue rh;
+
       intValue service_period;
       intValue service_counter;
       intValue heating_target;
