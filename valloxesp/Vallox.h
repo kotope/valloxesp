@@ -246,7 +246,7 @@ class Vallox {
     void checkStatusChange(int* oldValue, int newValue);
     
     void checkTemperatureChange(int* oldValue, int newValue);
-    boolean checkTemperatureChange(int *oldValue, int newValue, unsigned long* lastReceived);
+    void checkTemperatureChange(int *oldValue, int newValue, unsigned long* lastReceived);
 
     void checkSettingsChange(boolean* oldValue, boolean newValue);
 };

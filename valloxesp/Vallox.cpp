@@ -531,30 +531,20 @@ void Vallox::decodeMessage(const byte message[]) {
 
   // Temperature (status object)
   if (variable == VX_VARIABLE_T_OUTSIDE) { // OUTSIDE
-    if (checkTemperatureChange(&(data.t_outside.value), ntc2Cel(value), &(data.t_outside.lastReceived))) {
-
-    }
+    checkTemperatureChange(&(data.t_outside.value), ntc2Cel(value), &(data.t_outside.lastReceived));
   } else if (variable == VX_VARIABLE_T_EXHAUST) { // EXHAUST
-    if (checkTemperatureChange(&(data.t_exhaust.value), ntc2Cel(value), &(data.t_exhaust.lastReceived))) {
-
-    }
+    checkTemperatureChange(&(data.t_exhaust.value), ntc2Cel(value), &(data.t_exhaust.lastReceived));
   } else if (variable == VX_VARIABLE_T_INSIDE) { // INSIDE
-    if (checkTemperatureChange(&(data.t_inside.value), ntc2Cel(value), &(data.t_inside.lastReceived))) {
-
-    }
+    checkTemperatureChange(&(data.t_inside.value), ntc2Cel(value), &(data.t_inside.lastReceived));
   } else if (variable == VX_VARIABLE_T_INCOMING) { // INCOMING
-    if (checkTemperatureChange(&(data.t_incoming.value), ntc2Cel(value), &(data.t_incoming.lastReceived))) {
-
-    }
+    checkTemperatureChange(&(data.t_incoming.value), ntc2Cel(value), &(data.t_incoming.lastReceived));
   }
 
   // RH
-  else if (variable == VX_VARIABLE_RH1) {
-    checkStatusChange(&(data.rh1.value), hex2Rh(value));
-    data.rh1.lastReceived = now;
+  else if (variable == VX_VARIABLE_RH1) { 
+    checkTemperatureChange(&(data.rh1.value), hex2Rh(value), &(data.rh1.lastReceived));
   } else if (variable == VX_VARIABLE_RH2) {
-    checkStatusChange(&(data.rh2.value), hex2Rh(value));
-    data.rh2.lastReceived = now;
+    checkTemperatureChange(&(data.rh2.value), hex2Rh(value), &(data.rh2.lastReceived));
   }
 
   // Others (config object)
@@ -696,12 +686,11 @@ void Vallox::checkStatusChange(int* oldValue, int newValue) {
 
 //
 // Temperature change
-boolean Vallox::checkTemperatureChange(int *oldValue, int newValue, unsigned long *lastReceived) {
+void Vallox::checkTemperatureChange(int *oldValue, int newValue, unsigned long *lastReceived) {
   unsigned long now = millis();
 
   *lastReceived = now;
   checkTemperatureChange(oldValue, newValue);
-  return true;
 }
 
 void Vallox::checkTemperatureChange(int* oldValue, int newValue) {
