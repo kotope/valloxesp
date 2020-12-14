@@ -15,6 +15,7 @@ Tested and verified with:
 
 # Home Assistant custom_component (ha_integration)
 Contains three entities: climate, switch and binary_sensor
+Climate sensor has basic functionalty like mode: heat/ fan, fan speed: 1-8, heat target
 Binary sensor has multiple read-only attributes while climate control only controls target temperature, fan speed and operation mode
 Switch is used to perform boost or fireplace function (depending which one you have selected from vallox configuration)
 
@@ -35,9 +36,8 @@ sensor:
         friendly_name: Ventilation outside temperature
         unit_of_measurement: "°C"
 
-exposed attributes by binary_sensor:
+exposed read-only attributes by binary_sensor:
 - mode
-- heating
 - on
 - fault
 - rh_mode
@@ -53,9 +53,9 @@ exposed attributes by binary_sensor:
 - temp_inside
 - temp_incoming
 - temp_exhaust
-- rh
+- rh_1 (only if RH #1 sensor is installed)
+- rh_2 (only if RH #2 sensor is installed)
 - motor_in (read only)
 - motor_out (read only)
-- extra_func (read only)
 - front_heating (read only)
-- switch_type
+- switch_type (read only)
