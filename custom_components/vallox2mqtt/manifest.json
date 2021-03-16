@@ -1,0 +1,12 @@
+{
+    "domain": "vallox2mqtt",
+    "name": "vallox2mqtt",
+    "documentation": "https://www.creatingsmarthome.com/index.php/2020/08/25/guide-vallox-digit-ventilation-to-home-assistant-part-1-2-hardware/",
+    "version": "0.8.1",
+    "dependencies": ["mqtt"],
+    "codeowners": ["@tokorhon"],
+    "requirements": [],
+    "issue_tracker": "https://github.com/kotope/valloxesp/issues",
+    "config_flow": true
+}
+
