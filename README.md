@@ -11,6 +11,7 @@ Tested and verified with:
 - Vallox 121 SE (version without front heating module)
 - Vallox 121 SE (version with front heating)
 - Vallox Digit SE
+- Vallox Digit SE 2
 - Vallox 096 SE
 
 # Home Assistant custom_component (ha_integration)
