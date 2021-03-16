@@ -2,8 +2,10 @@
     "domain": "vallox2mqtt",
     "name": "vallox2mqtt",
     "documentation": "",
+    "version": "0.8.1",
     "dependencies": ["mqtt"],
-    "codeowners": ["toni korhonen"],
-    "requirements": []
+    "codeowners": ["@tokorhon"],
+    "requirements": [],
+    "config_flow": true
 }
 

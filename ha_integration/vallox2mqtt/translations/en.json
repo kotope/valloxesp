@@ -1,0 +1,16 @@
+{
+  "config": {
+    "title": "Vallox2mqtt",
+    "step": {
+      "user": {
+        "title": "Vallox2mqtt configuration",
+        "data": {
+          "name": "Friendly name",
+          "state_topic": "Vallox MQTT state topic",
+          "command_topic": "Vallox MQTT command topic",
+          "temperature_state_topic": "Vallox MQTT temperature state topic"
+        }
+      }
+    }
+  }
+}

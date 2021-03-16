@@ -14,6 +14,8 @@ from homeassistant.helpers.dispatcher import (
     async_dispatcher_send,
 )
 
+from .const import (NAME, VERSION, MANUFACTURER)
+
 from homeassistant.components.climate import (
     ClimateEntity)
 from homeassistant.components.climate.const import (
@@ -38,14 +40,21 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
     """Set up the sensor platform."""
     add_entities([ValloxDigitClimate(hass)])
 
+async def async_setup_entry(hass, entry, async_add_devices):
+    """Setup sensor platform."""
+    async_add_devices([
+      ValloxDigitClimate(hass, entry)
+    ])
 
 class ValloxDigitClimate(ClimateEntity):
     """Representation of a sensor."""
 
-    def __init__(self, hass):
+    def __init__(self, hass, entry):
         """Initialize the sensor."""
-        self._vallox2mqtt = hass.data[DOMAIN]
+        self._entry = entry
+        self._vallox2mqtt = hass.data[DOMAIN][entry.entry_id]
         self._state = None
+        self._config_entry = entry
 
     async def update_data(self):
         """Fetch new state data for the sensor.
@@ -59,6 +68,11 @@ class ValloxDigitClimate(ClimateEntity):
         self.async_on_remove(
             async_dispatcher_connect(self.hass, SIGNAL_STATE_UPDATED, self.update_data)
         )
+
+    @property
+    def unique_id(self):
+        """Return a unique ID to use for this entity."""
+        return f"{DOMAIN}_climate"
 
     @property
     def supported_features(self):
@@ -128,6 +142,15 @@ class ValloxDigitClimate(ClimateEntity):
     def hvac_modes(self):
         """List of available operation modes."""
         return [me_to_ha[k] for k in self._vallox2mqtt._hvac_modes]
+
+    @property
+    def device_info(self):
+        return {
+            "identifiers": {(DOMAIN, self._config_entry.entry_id)},
+            "name": NAME,
+            "model": VERSION,
+            "manufacturer": MANUFACTURER
+        }
 
     async def async_set_temperature(self, **kwargs):
         """Set new target temperatures."""

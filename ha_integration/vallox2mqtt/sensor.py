@@ -3,12 +3,6 @@ import logging
 
 from homeassistant.helpers.entity import Entity
 
-from homeassistant.components import binary_sensor
-from homeassistant.components.binary_sensor import (
-    DEVICE_CLASSES_SCHEMA,
-    BinarySensorEntity,
-)
-
 from . import DOMAIN, SIGNAL_STATE_UPDATED
 from homeassistant.helpers.dispatcher import (
     async_dispatcher_connect,
@@ -16,26 +10,25 @@ from homeassistant.helpers.dispatcher import (
 )
 
 from .const import (NAME, VERSION, MANUFACTURER)
+from homeassistant.const import (TEMP_CELSIUS)
 
 _LOGGER = logging.getLogger(__name__)
-
-# TODO: Remove this old style shit
-#def setup_platform(hass, config, add_entities, discovery_info=None):
-#    """Set up the sensor platform."""
-#    add_entities([ValloxDigitBinarySensor(hass)])
 
 async def async_setup_entry(hass, entry, async_add_devices):
     """Setup sensor platform."""
     async_add_devices([
-      ValloxDigitStatusSensor(hass, entry),
-      ValloxDigitAttributedBinarySensor(hass, entry, "Motor In", 'motor_in'),
-      ValloxDigitAttributedBinarySensor(hass, entry, "Motor Out", 'motor_out'),
-      ValloxDigitAttributedBinarySensor(hass, entry, "Summer Mode", 'summer_mode'),
-      ValloxDigitAttributedBinarySensor(hass, entry, "Front Heating", 'front_heating')
+      ValloxDigitAttributedSensor(hass, entry, "Outside Temperature", 'temp_outside', TEMP_CELSIUS, "mdi:thermometer"),
+      ValloxDigitAttributedSensor(hass, entry, "Inside Temperature", 'temp_inside', TEMP_CELSIUS, "mdi:thermometer"),
+      ValloxDigitAttributedSensor(hass, entry, "Incoming Temperature", 'temp_incoming', TEMP_CELSIUS, "mdi:thermometer"),
+      ValloxDigitAttributedSensor(hass, entry, "Exhaust Temperature", 'temp_exhaust', TEMP_CELSIUS, "mdi:thermometer"),
+      ValloxDigitAttributedSensor(hass, entry, "RH 1", 'rh1', "%", "mdi:water-percent"),
+      ValloxDigitAttributedSensor(hass, entry, "RH 2", 'rh2', "%", "mdi:water-percent"),
+      ValloxDigitAttributedSensor(hass, entry, "Service Counter", 'service_counter', "Months"),
+      ValloxDigitAttributedSensor(hass, entry, "Switch Type", 'switch_type', ""),
    ])
 
-class ValloxDigitBinarySensor(BinarySensorEntity):
-    """Base implementation of vallox binary sensor"""
+class ValloxDigitSensor(Entity):
+    """Base implementation of vallox sensor"""
     def __init__(self, hass, entry):
         """Initialize the sensor."""
         self._vallox2mqtt = hass.data[DOMAIN][entry.entry_id]
@@ -69,11 +62,13 @@ class ValloxDigitBinarySensor(BinarySensorEntity):
             async_dispatcher_connect(self.hass, SIGNAL_STATE_UPDATED, self.update_data)
         )
 
-class ValloxDigitAttributedBinarySensor(ValloxDigitBinarySensor):
-    def __init__(self, hass, entry, fname, attr_name):
+class ValloxDigitAttributedSensor(ValloxDigitSensor):
+    def __init__(self, hass, entry, fname, attr_name, unit, icon=None):
         super().__init__(hass, entry)
         self._attr_name = attr_name
         self._fname = fname
+        self._unit = unit
+        self._icon = icon
 
     @property
     def unique_id(self):
@@ -86,8 +81,8 @@ class ValloxDigitAttributedBinarySensor(ValloxDigitBinarySensor):
         return f"{self._vallox2mqtt._name} {self._fname}"
 
     @property
-    def is_on(self):
-        """Return true if the binary sensor is on."""
+    def state(self):
+        """Return the state of the sensor."""
         return self._vallox2mqtt._attrs[self._attr_name]
 
     @property
@@ -97,28 +92,12 @@ class ValloxDigitAttributedBinarySensor(ValloxDigitBinarySensor):
         else:
           return False
 
-class ValloxDigitStatusSensor(ValloxDigitBinarySensor):
-    """Representation of a sensor."""
-    def __init__(self, hass, entry):
-        """Initialize the sensor."""
-        super().__init__(hass, entry)
+    @property
+    def unit_of_measurement(self):
+        """Return the unit of measurement of the sensor."""
+        return self._unit
 
     @property
-    def unique_id(self):
-        """Return a unique ID to use for this entity."""
-        return f"{DOMAIN}_status"
-
-    @property
-    def name(self):
-        """Return the name of the binary device."""
-        return self._vallox2mqtt._name
-
-    @property
-    def is_on(self):
-        """Return true if the binary sensor is on."""
-        return self._vallox2mqtt._state
-
-    @property
-    def device_state_attributes(self):
-        """Return the state attributes."""
-        return self._vallox2mqtt._attrs
+    def icon(self):
+        """Return the icon of the sensor."""
+        return self._icon

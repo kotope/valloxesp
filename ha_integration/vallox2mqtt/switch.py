@@ -11,6 +11,7 @@ import logging
 import voluptuous as vol
 import json
 
+from .const import (NAME, VERSION, MANUFACTURER)
 from . import DOMAIN, SIGNAL_STATE_UPDATED
 from homeassistant.helpers.dispatcher import (
     async_dispatcher_connect,
@@ -25,13 +26,19 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
     """Set up the sensor platform."""
     add_entities([ValloxDigitSwitch(hass)])
 
+async def async_setup_entry(hass, entry, async_add_devices):
+    """Setup sensor platform."""
+    async_add_devices([
+      ValloxDigitSwitch(hass, entry)
+    ])
 
 class ValloxDigitSwitch(SwitchEntity):
     """Representation of a sensor."""
-    def __init__(self, hass):
+    def __init__(self, hass, entry):
         """Initialize the sensor."""
-        self._vallox2mqtt = hass.data[DOMAIN]
+        self._vallox2mqtt = hass.data[DOMAIN][entry.entry_id]
         self._state = None
+        self._config_entry = entry
 
     async def update_data(self):
         """Fetch new state data for the sensor.
@@ -47,6 +54,11 @@ class ValloxDigitSwitch(SwitchEntity):
         )
 
     @property
+    def unique_id(self):
+        """Return a unique ID to use for this entity."""
+        return f"{DOMAIN}_switch"
+
+    @property
     def should_poll(self):
         return False
 
@@ -59,6 +71,15 @@ class ValloxDigitSwitch(SwitchEntity):
     def is_on(self):
         """Return true if boost/fireplace is on."""
         return self._vallox2mqtt._switch_active
+
+    @property
+    def device_info(self):
+        return {
+            "identifiers": {(DOMAIN, self._config_entry.entry_id)},
+            "name": NAME,
+            "model": VERSION,
+            "manufacturer": MANUFACTURER
+        }
 
     async def async_turn_on(self, **kwargs):
         """Turn on switch."""
