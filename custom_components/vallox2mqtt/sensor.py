@@ -21,8 +21,8 @@ async def async_setup_entry(hass, entry, async_add_devices):
       ValloxDigitAttributedSensor(hass, entry, "Inside Temperature", 'temp_inside', TEMP_CELSIUS, "mdi:thermometer"),
       ValloxDigitAttributedSensor(hass, entry, "Incoming Temperature", 'temp_incoming', TEMP_CELSIUS, "mdi:thermometer"),
       ValloxDigitAttributedSensor(hass, entry, "Exhaust Temperature", 'temp_exhaust', TEMP_CELSIUS, "mdi:thermometer"),
-      ValloxDigitAttributedSensor(hass, entry, "RH 1", 'rh1', "%", "mdi:water-percent"),
-      ValloxDigitAttributedSensor(hass, entry, "RH 2", 'rh2', "%", "mdi:water-percent"),
+      ValloxDigitAttributedSensor(hass, entry, "RH 1", 'rh_1', "%", "mdi:water-percent"),
+      ValloxDigitAttributedSensor(hass, entry, "RH 2", 'rh_2', "%", "mdi:water-percent"),
       ValloxDigitAttributedSensor(hass, entry, "Service Counter", 'service_counter', "Months"),
       ValloxDigitAttributedSensor(hass, entry, "Switch Type", 'switch_type', ""),
    ])
