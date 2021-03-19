@@ -1,0 +1,7 @@
+{
+  "name": "vallox2mqtt",
+  "country": "EN",
+  "domains": ["sensor", "climate", "binary_sensor"],
+  "homeassistant": "2021.3.2",
+  "iot_class": ["Local Push"]
+}

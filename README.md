@@ -13,48 +13,22 @@ Tested and verified with:
 - Vallox Digit SE
 - Vallox 096 SE
 
-# Home Assistant custom_component (ha_integration)
-Contains three entities: climate, switch and binary_sensor
-* Climate sensor has basic functionalty like mode: heat/ fan, fan speed: 1-8, heat target
-* Binary sensor has multiple read-only attributes
-* Switch is used to perform boost or fireplace function (depending which one you have selected from vallox configuration)
+# Home Assistant component (custom_components)
+Contained entities:
+* climate: Climate sensor has basic functionalty like mode: heat/ fan, fan speed: 1-8, heat target
+* status: Binary status sensor (on/off) that has multiple read-only attributes
+* switch: Switch is used to perform boost or fireplace function (depending which one you have selected from vallox configuration)
+* sensor: switch type to see if switch is configured as fireplace or boost
+* sensors: outside, inside, exhaust and incoming temperatures
+* sensors: rh1 and rh2 if supported by your Vallox Ventilation machine
+* binary sensors: motor in/motor out statuses
+* binary sensor: summer mode
+* sensor: service counter (how many months until you have to replace your filters)
 
-configuration by configurations.yaml:
-vallox2mqtt:
-  name: "Ventilation"
-  temperature_state_topic: "vallox/temp"
-  command_topic: "vallox/set"
-  state_topic: "vallox/state"
+# Configuration
+See guide at https://www.creatingsmarthome.com/?p=105
 
-After those, you can create templated sensors like:
-sensor:
-  - platform: template
-    sensors:
-      ventilation_outside_temp:
-        value_template: "{{ states.binary_sensor.ventilation.attributes.temp_outside }}"
-        friendly_name: Ventilation outside temperature
-        unit_of_measurement: "°C"
+## Breaking changes
+Configuration is no longer possible by using configurations.yaml. Please use UI configuration from integrations!
 
-exposed read-only attributes by binary_sensor:
-- mode
-- on
-- fault
-- rh_mode
-- filter
-- service_needed
-- summer_mode
-- speed
-- default_fan_speed
-- service_period
-- service_counter
-- heat_target
-- temp_outside
-- temp_inside
-- temp_incoming
-- temp_exhaust
-- rh_1 (only if RH #1 sensor is installed)
-- rh_2 (only if RH #2 sensor is installed)
-- motor_in (read only)
-- motor_out (read only)
-- front_heating (read only)
-- switch_type (read only)
+If you have old configuration in configurations.yaml, please remove it and make a new configuration through UI.

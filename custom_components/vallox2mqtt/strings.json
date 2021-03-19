@@ -11,6 +11,13 @@
           "temperature_state_topic": "Vallox MQTT temperature state topic"
         }
       }
+    },
+    "error": {
+      "mqtt": "MQTT is required for this integration."
+    },
+    "abort": {
+      "single_instance_allowed": "Only a single configuration is allowed",
+      "mqtt_required": "MQTT is required for this integration."
     }
   }
 }
