@@ -217,8 +217,6 @@ void Vallox::setHeatingTarget(int cel) {
 
 void Vallox::setSwitchOn() {
   // Activate boost/fireplace
-  // TODO: This seems to fail now ?
-
   setVariable(VX_VARIABLE_FLAGS_06, data.flags06.value | VX_06_FIREPLACE_FLAG_ACTIVATE);
 }
 
@@ -303,15 +301,6 @@ boolean Vallox::isFrontHeating() {
 
 boolean Vallox::isMotorOut() {
   return data.is_out_motor.value;
-}
-
-boolean Vallox::isExtraFunc() {
-  return data.is_extra_func.value;
-}
-
-
-boolean Vallox::isFilter() {
-  return data.is_filter.value;
 }
 
 boolean Vallox::isHeating() {

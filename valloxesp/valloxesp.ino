@@ -13,6 +13,8 @@
 #define JSON_BUFFER_LENGTH 2048
 #define DEBUG false // default value for debug
 
+#define VALLOXESP_VERSION "0.8.1" // this version
+
 // Callbacks
 void mqttCallback(char* topic, byte* payload, unsigned int payloadLength);
 
@@ -175,7 +177,6 @@ void publishState() {
   root["on"] = vx.isOn();
   root["fault"] = vx.isFault();
   root["rh_mode"] = vx.isRhMode();
-  root["filter"] = vx.isFilter();
   root["service_needed"] = vx.isServiceNeeded();
   
   root["summer_mode"] = vx.isSummerMode();
@@ -183,7 +184,6 @@ void publishState() {
   root["motor_in"] = !vx.isMotorIn();
   root["motor_out"] = !vx.isMotorOut();
   root["front_heating"] = vx.isFrontHeating();
-  root["extra_func"] = vx.isExtraFunc();
  
   // Int values
   root["speed"] = vx.getFanSpeed();
@@ -193,6 +193,8 @@ void publishState() {
   root["heat_target"] = vx.getHeatingTarget();  
 
   root["switch_active"] = vx.isSwitchActive();
+
+  root["valloxesp_sw_version"] = VALLOXESP_VERSION;
 
   if (vx.getSwitchType() != NOT_SET) {
     root["switch_type"] = vx.getSwitchType() == 1 ? "boost" : "fireplace";
