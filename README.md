@@ -1,5 +1,5 @@
 # Vallox to home assistant
-Vallox Digit ventilation control software for ESP-01 & Home Assistant integration
+Vallox SE (RS-485 supported) ventilation control software for ESP-01 & Home Assistant integration
 
 # ESP-01 (valloxesp)
 See guide at https://www.creatingsmarthome.com/?p=73
@@ -7,11 +7,12 @@ See guide at https://www.creatingsmarthome.com/?p=73
 Thanks for original vallox libary implementation by dirtyha:
 https://github.com/dirtyha/my-esp8266/tree/master/Vallox
 
-Tested and verified with:
+## Tested and verified with:
+- Vallox 096 SE
 - Vallox 121 SE (version without front heating module)
 - Vallox 121 SE (version with front heating)
 - Vallox Digit SE
-- Vallox 096 SE
+- Vallox Digit SE 2
 
 # Home Assistant component (custom_components)
 Contained entities:
