@@ -1,9 +1,8 @@
 """Vallox2mqtt Platform integration."""
 
 import logging
-import voluptuous as vol
-import homeassistant.helpers.config_validation as cv
 import json
+import asyncio
 
 from homeassistant.components.mqtt import (
     CONF_STATE_TOPIC, CONF_COMMAND_TOPIC, CONF_QOS, CONF_RETAIN,
@@ -12,6 +11,9 @@ from homeassistant.const import (
     CONF_NAME, CONF_VALUE_TEMPLATE, TEMP_CELSIUS, ATTR_TEMPERATURE)
 from homeassistant.components.mqtt.climate import (
     CONF_TEMP_STATE_TOPIC, CONF_MODE_LIST)
+from .const import (DOMAIN, PLATFORMS)
+from homeassistant import config_entries, core
+
 import homeassistant.components.mqtt as mqtt
 
 from homeassistant.helpers.dispatcher import (
@@ -19,45 +21,65 @@ from homeassistant.helpers.dispatcher import (
     async_dispatcher_send,
 )
 
-DOMAIN = 'vallox2mqtt'
 SIGNAL_STATE_UPDATED = f"{DOMAIN}.updated"
 AVAILABLE_MODES = ["HEAT", "FAN"]
 
 _LOGGER = logging.getLogger(__name__)
 
-CONFIG_SCHEMA = vol.Schema(
-    {
-        DOMAIN: vol.Schema(
-            {
-                vol.Required(CONF_NAME): cv.string,
-                vol.Required(CONF_STATE_TOPIC): cv.string,
-                vol.Required(CONF_COMMAND_TOPIC): cv.string,
-                vol.Required(CONF_TEMP_STATE_TOPIC): cv.string,
-
-            }
-        )
-    },
-    extra=vol.ALLOW_EXTRA,
-)
-
 async def async_setup(hass, config):
-    """Your controller/hub specific code."""
-    hass.data[DOMAIN] = Vallox2mqtt(hass, config)
-    await hass.data[DOMAIN]._subscribe_topics()
-    hass.helpers.discovery.load_platform('climate', DOMAIN, {}, config)
-    hass.helpers.discovery.load_platform('binary_sensor', DOMAIN, {}, config)
-    hass.helpers.discovery.load_platform('switch', DOMAIN, {}, config)
+    """Config from yaml file"""
     return True
 
+async def async_setup_entry(hass, entry):
+    """Config entry setup"""
+    if hass.data.get(DOMAIN) is None:
+        hass.data.setdefault(DOMAIN, {})
+
+    config = entry.data
+    _LOGGER.debug(f"config = {config}")
+
+    hass.data[DOMAIN][entry.entry_id] = Vallox2mqtt(hass, config)
+    await hass.data[DOMAIN][entry.entry_id]._subscribe_topics()
+
+    # setup platforms
+    for platform in PLATFORMS:
+        hass.async_add_job(
+            hass.config_entries.async_forward_entry_setup(entry, platform)
+        )
+    return True
+
+async def async_unload_entry(hass, entry):
+    """Unload a config entry."""
+    unload_ok = all(
+        await asyncio.gather(
+            *[
+                hass.config_entries.async_forward_entry_unload(entry, platform)
+                for platform in PLATFORMS
+            ]
+        )
+    )
+    # Remove config entry from domain.
+    if unload_ok:
+        hass.data[DOMAIN].pop(entry.entry_id)
+
+    return unload_ok
+
+async def async_reload_entry(hass, entry) -> bool:
+    """Reload config entry."""
+    await async_unload_entry(hass, entry)
+    await async_setup_entry(hass, entry)
+
+
 class Vallox2mqtt():
+    """Vallox2mqtt coordinator"""
     def __init__(self, hass, config):
-        self._name = config.get(DOMAIN, {}).get(CONF_NAME,'')
+        self._name = config.get(CONF_NAME,'')
         self._hass = hass
- 
+
         # MQTT stuff
-        self._state_topic = config.get(DOMAIN, {}).get(CONF_STATE_TOPIC,'')
-        self._temp_state_topic = config.get(DOMAIN, {}).get(CONF_TEMP_STATE_TOPIC,'')
-        self._command_topic = config.get(DOMAIN, {}).get(CONF_COMMAND_TOPIC,'')
+        self._state_topic = config.get(CONF_STATE_TOPIC,'')
+        self._temp_state_topic = config.get(CONF_TEMP_STATE_TOPIC,'')
+        self._command_topic = config.get(CONF_COMMAND_TOPIC,'')
         self._sub_state = None
         self._qos = 0 # TODO: Take these from config
         self._retain = False
@@ -67,11 +89,11 @@ class Vallox2mqtt():
         self._fan_mode = None
         self._hvac_modes = AVAILABLE_MODES
 
-        # Status from mqtt 
+        # Status from mqtt
         self._current_temperature = None
-        self._target_temperature = None      
+        self._target_temperature = None
         self._attrs = {}
-        self._hvac_mode = "FAN" 
+        self._hvac_mode = "FAN"
         self._current_status = False
         self._current_power = None
         self._fan_mode = None
@@ -111,7 +133,7 @@ class Vallox2mqtt():
                 self._current_temperature = float(parsed['temp_incoming'])
                 self._attrs.update(parsed)
             else:
-                print("unknown topic")
+                print("unknown topic") # TODO: Log as error
             async_dispatcher_send(self._hass, SIGNAL_STATE_UPDATED)
 
         for topic in [self._state_topic, self._temp_state_topic]:

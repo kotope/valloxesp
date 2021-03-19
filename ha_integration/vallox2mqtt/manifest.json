@@ -1,9 +1,0 @@
-{
-    "domain": "vallox2mqtt",
-    "name": "vallox2mqtt",
-    "documentation": "",
-    "dependencies": ["mqtt"],
-    "codeowners": ["toni korhonen"],
-    "requirements": []
-}
-
