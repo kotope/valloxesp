@@ -17,3 +17,8 @@ const char* vallox_temp_topic         = "vallox/temp"; // temperature topic
 const char* vallox_set_topic          = "vallox/set"; // set topic
 const char* vallox_state_topic        = "vallox/state"; // dynamically updatig values (on/off, temp, etc ...)
 const char* vallox_debug_topic        = "vallox/debug"; // debug topic
+
+
+// Uncomment if using Vallox Digit SE and problems with fireplace switch indication
+// This forces flags 06 variable (boost/fireplace switch status to be queried instead of variable push)
+//#define VALLOX_DIGIT_SE

@@ -11,9 +11,9 @@
 #include "Vallox.h"
 
 #define JSON_BUFFER_LENGTH 2048
-#define DEBUG false // default value for debug
+#define DEBUG true // default value for debug
 
-#define VALLOXESP_VERSION "0.8.1" // this version
+#define VALLOXESP_VERSION "0.8.2" // this version
 
 // Callbacks
 void mqttCallback(char* topic, byte* payload, unsigned int payloadLength);

@@ -106,6 +106,10 @@ void Vallox::loop() {
     if (isStatusInitDone()) {
       sendIO08Req();
       sendServiceCounterReq();
+
+#ifdef VALLOX_DIGIT_SE
+      sendFlags06Req();
+#endif
     }
   }
 
@@ -218,6 +222,11 @@ void Vallox::setHeatingTarget(int cel) {
 void Vallox::setSwitchOn() {
   // Activate boost/fireplace
   setVariable(VX_VARIABLE_FLAGS_06, data.flags06.value | VX_06_FIREPLACE_FLAG_ACTIVATE);
+
+#ifdef VALLOX_DIGIT_SE
+  lastRequested = millis() + 500; // Reset retry loop to get about correct time when fireplace switch is ending in 15 minutes
+  statusChangedCallback();
+#endif
 }
 
 void Vallox::setDebug(bool debug) {
