@@ -11,7 +11,7 @@
 #define VX_MSG_DOMAIN 0x01
 #define VX_MSG_POLL_BYTE 0x00
 #define NOT_SET -999
-#define QUERY_INTERVAL 300000 // in ms (10min)
+#define QUERY_INTERVAL 300000 // in ms (5min)
 #define RETRY_INTERVAL 5000 // in ms (5 sec)
 
 // senders and receivers
