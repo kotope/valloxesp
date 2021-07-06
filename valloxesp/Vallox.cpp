@@ -163,14 +163,24 @@ void Vallox::setRhModeOff() {
 }
 
 void Vallox::setHeatingModeOn() {
-  if (setStatusVariable(VX_VARIABLE_STATUS, data.status.value | VX_STATUS_FLAG_HEATING_MODE)) {
+  // Don't set if already active. Vallox seems to reset to default speed if same mode is set twice
+  if (data.status.value & VX_STATUS_FLAG_HEATING_MODE) {
+    debugPrintCallback("Heating mode is already on!");
+    statusChangedCallback();
+  }
+  else if (setStatusVariable(VX_VARIABLE_STATUS, data.status.value | VX_STATUS_FLAG_HEATING_MODE)) {
     data.is_heating_mode.value = true;
     statusChangedCallback();
   }
 }
 
 void Vallox::setHeatingModeOff() {
-  if (setStatusVariable(VX_VARIABLE_STATUS, data.status.value & ~VX_STATUS_FLAG_HEATING_MODE)) {
+  // Don't set if already active. Vallox seems to reset to default speed if same mode is set twice
+  if (!(data.status.value & VX_STATUS_FLAG_HEATING_MODE)) {
+    debugPrintCallback("Heating mode is already off!");
+    statusChangedCallback();
+  }
+  else if (setStatusVariable(VX_VARIABLE_STATUS, data.status.value & ~VX_STATUS_FLAG_HEATING_MODE)) {
     data.is_heating_mode.value = false;
     statusChangedCallback();
   }
