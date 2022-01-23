@@ -13,7 +13,7 @@
 #define JSON_BUFFER_LENGTH 2048
 #define DEBUG false // default value for debug
 
-#define VALLOXESP_VERSION "0.8.2" // this version
+#define VALLOXESP_VERSION "0.9.1-dev" // this version
 
 // Callbacks
 void mqttCallback(char* topic, byte* payload, unsigned int payloadLength);
@@ -133,20 +133,33 @@ void handleUpdate(byte * payload) {
       // Fan only
       if (!vx.isOn()) {
         vx.setOn();
+        delay(5000);
       }
-      vx.setHeatingModeOff();
+
+      if (vx.isHeatingMode()) {
+        vx.setHeatingModeOff();
+      }
     } else if (m == "HEAT") {
       // Set heat mode
       if (!vx.isOn()) {
         vx.setOn();
+
+        delay(5000);
       }
-      vx.setHeatingModeOn();
+      
+      if(!vx.isHeatingMode()) {
+        vx.setHeatingModeOn();
+      }
     }
-   
+    else if (m == "OFF") {
+      if (vx.isOn()) {
+        vx.setOff();
+      }
+    }
   }
 
-  // I've disabled possibility to turn off the ventilation
-  // If you wish to have such feature, feel free to implement :-)
+  // NOTE: Turning off feature is experimental and might not work properly 
+  // It currently is having some issues if state change is made too quickly!
 
   // Speed
   if (d.containsKey("speed")) {

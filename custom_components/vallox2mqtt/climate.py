@@ -21,7 +21,7 @@ from homeassistant.components.climate import (
 from homeassistant.components.climate.const import (
     SUPPORT_TARGET_TEMPERATURE,
     SUPPORT_FAN_MODE,
-    HVAC_MODE_HEAT, HVAC_MODE_FAN_ONLY,
+    HVAC_MODE_HEAT, HVAC_MODE_FAN_ONLY, HVAC_MODE_OFF,
     CURRENT_HVAC_OFF, CURRENT_HVAC_HEAT, CURRENT_HVAC_FAN)
 
 SUPPORT_FLAGS = SUPPORT_TARGET_TEMPERATURE | SUPPORT_FAN_MODE
@@ -33,7 +33,7 @@ ATTR_INCOMING_TEMP = 'incoming'
 
 _LOGGER = logging.getLogger(__name__)
 
-ha_to_me = {HVAC_MODE_HEAT: 'HEAT', HVAC_MODE_FAN_ONLY: 'FAN'}
+ha_to_me = {HVAC_MODE_HEAT: 'HEAT', HVAC_MODE_FAN_ONLY: 'FAN', HVAC_MODE_OFF: 'OFF'}
 me_to_ha = {v: k for k, v in ha_to_me.items()}
 
 def setup_platform(hass, config, add_entities, discovery_info=None):

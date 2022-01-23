@@ -22,7 +22,7 @@ from homeassistant.helpers.dispatcher import (
 )
 
 SIGNAL_STATE_UPDATED = f"{DOMAIN}.updated"
-AVAILABLE_MODES = ["HEAT", "FAN"]
+AVAILABLE_MODES = ["HEAT", "FAN", "OFF"]
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -147,27 +147,31 @@ class Vallox2mqtt():
         if self._target_temperature is None:
             return
         unencoded = '{"heat_target":' + str(round(self._target_temperature * 2) / 2.0) + '}'
-        mqtt.async_publish(self._hass, self._command_topic, unencoded,
-                     self._qos, self._retain)
+        self._hass.async_create_task(
+          mqtt.async_publish(self._hass, self._command_topic, unencoded,
+                       self._qos, self._retain))
 
     def _publish_hvac_mode(self):
         """Set new hvac mode."""
+        _LOGGER.debug(f"Publishing HVAC mode: {self._hvac_mode}")
+
         if self._hvac_mode is None:
             return
         payload = '{"mode":"' + self._hvac_mode + '"}'
-        mqtt.async_publish(self._hass, self._command_topic, payload,
-            self._qos, self._retain)
+        _LOGGER.debug(f"Payload= {payload}, mqtt={mqtt}")
+        self._hass.async_create_task(mqtt.async_publish(self._hass, self._command_topic, payload,
+            self._qos, self._retain))
 
     def _publish_fan_mode(self): 
         """Set new fan mode."""
         if self._fan_mode is None:
             return
         payload = '{"speed":' + self._fan_mode + '}'
-        mqtt.async_publish(self._hass, self._command_topic, payload,
-            self._qos, self._retain)
+        self._hass.async_create_task(mqtt.async_publish(self._hass, self._command_topic, payload,
+            self._qos, self._retain))
 
     def _publish_switch_on(self):
         """Set fireplace/boost switch on."""
         payload = '{"activate_switch": true}'
-        mqtt.async_publish(self._hass, self._command_topic, payload,
-            self._qos, self._retain)
+        self._hass.async_create_task(mqtt.async_publish(self._hass, self._command_topic, payload,
+            self._qos, self._retain))

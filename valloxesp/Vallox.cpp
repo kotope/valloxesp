@@ -106,6 +106,7 @@ void Vallox::loop() {
     if (isStatusInitDone()) {
       sendIO08Req();
       sendServiceCounterReq();
+      sendStatusReq(); // query for status to ensure everything is in sync
     }
   }
 
