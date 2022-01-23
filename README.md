@@ -9,10 +9,12 @@ https://github.com/dirtyha/my-esp8266/tree/master/Vallox
 
 ## Tested and verified with:
 - Vallox 096 SE
+- Vallox 110 SE
 - Vallox 121 SE (version without front heating module)
 - Vallox 121 SE (version with front heating)
 - Vallox Digit SE
 - Vallox Digit SE 2
+- Vallox ValloPlus 350 SE
 
 # Home Assistant component (custom_components)
 Contained entities:
@@ -33,3 +35,7 @@ See guide at https://www.creatingsmarthome.com/?p=105
 Configuration is no longer possible by using configurations.yaml. Please use UI configuration from integrations!
 
 If you have old configuration in configurations.yaml, please remove it and make a new configuration through UI.
+
+
+## Support the developer?
+[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/tokorhon)
