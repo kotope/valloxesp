@@ -15,6 +15,11 @@ from .const import (DOMAIN, PLATFORMS)
 from homeassistant import config_entries, core
 
 import homeassistant.components.mqtt as mqtt
+from homeassistant.components.mqtt.subscription import (
+    async_prepare_subscribe_topics,
+    async_subscribe_topics,
+    async_unsubscribe_topics,
+)
 
 from homeassistant.helpers.dispatcher import (
     async_dispatcher_connect,
@@ -139,8 +144,9 @@ class Vallox2mqtt():
         for topic in [self._state_topic, self._temp_state_topic]:
             add_subscription(topics, topic, message_received)
 
-        self._sub_state = await subscription.async_subscribe_topics(
-            self._hass, self._sub_state, topics)
+        self._sub_state = async_prepare_subscribe_topics(self._hass, self._sub_state, topics)
+        await subscription.async_subscribe_topics(
+            self._hass, self._sub_state)
 
     def _publish_temperature(self):
         """Set new target temperature."""
