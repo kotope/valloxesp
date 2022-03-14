@@ -36,6 +36,8 @@ Configuration is no longer possible by using configurations.yaml. Please use UI 
 
 If you have old configuration in configurations.yaml, please remove it and make a new configuration through UI.
 
+# Experimental
+Initial ESPHome support added! Thanks @github-k8n
 
 ## Support the developer?
 [!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/tokorhon)

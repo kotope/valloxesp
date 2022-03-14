@@ -1,0 +1,124 @@
+esphome:
+  includes:
+    - Vallox.h
+
+uart:
+  id: uart_bus
+  tx_pin: D1
+  rx_pin: D2
+  baud_rate: 9600
+
+sensor:
+## temperature sensors
+  - platform: template
+    id: vallox_outside
+    name: vallox_outside
+    unit_of_measurement: "°C"
+    accuracy_decimals: 0
+  - platform: template
+    id: vallox_inside
+    name: vallox_inside
+    unit_of_measurement: "°C"
+    accuracy_decimals: 0
+  - platform: template
+    id: vallox_incoming
+    name: vallox_incoming
+    unit_of_measurement: "°C"
+    accuracy_decimals: 0
+  - platform: template
+    id: vallox_exhaust
+    name: vallox_exhaust
+    unit_of_measurement: "°C"
+    accuracy_decimals: 0
+## misc sensors
+  - platform: template
+    id: vallox_speed
+    name: vallox_speed
+    accuracy_decimals: 0
+  - platform: template
+    id: vallox_default_fan_speed
+    name: vallox_default_fan_speed
+    accuracy_decimals: 0
+  - platform: template
+    id: vallox_service_period
+    name: vallox_service_period
+    unit_of_measurement: "months"
+    accuracy_decimals: 0
+  - platform: template
+    id: vallox_service_counter
+    name: vallox_service_counter
+    unit_of_measurement: "months"
+    accuracy_decimals: 0
+  - platform: template
+    id: vallox_heat_target
+    name: vallox_heat_target
+    unit_of_measurement: "°C"
+    accuracy_decimals: 0
+
+text_sensor:
+  - platform: template
+    id: vallox_switch_type
+    name: vallox_switch_type    
+
+binary_sensor:
+  - platform: template
+    id: vallox_switch_active
+    name: vallox_switch_active  
+  - platform: template
+    id: vallox_heating
+    name: vallox_heating
+  - platform: template
+    id: vallox_on
+    name: vallox_on
+  - platform: template
+    id: vallox_fault
+    name: vallox_fault
+  - platform: template
+    id: vallox_rh_mode
+    name: vallox_rh_mode
+  - platform: template
+    id: vallox_service_needed
+    name: vallox_service_needed
+  - platform: template
+    id: vallox_summer_mode
+    name: vallox_summer_mode
+  - platform: template
+    id: vallox_motor_in
+    name: vallox_motor_in
+  - platform: template
+    id: vallox_motor_out
+    name: vallox_motor_out
+  - platform: template
+    id: vallox_front_heating
+    name: vallox_front_heating
+
+climate:
+- platform: custom
+  id: my_vallox
+  lambda: |-
+    auto my_vallox = new Vallox(id(uart_bus),
+      id(vallox_outside),
+      id(vallox_inside),
+      id(vallox_incoming),
+      id(vallox_exhaust),
+      id(vallox_speed),
+      id(vallox_default_fan_speed),
+      id(vallox_service_period),
+      id(vallox_service_counter),
+      id(vallox_heat_target),
+      id(vallox_switch_type),
+      id(vallox_switch_active),
+      id(vallox_heating),
+      id(vallox_on),
+      id(vallox_fault),
+      id(vallox_rh_mode),
+      id(vallox_service_needed),
+      id(vallox_summer_mode),
+      id(vallox_motor_in),
+      id(vallox_motor_out),
+      id(vallox_front_heating)
+    );
+    App.register_component(my_vallox);
+    return {my_vallox};
+  climates:
+    - name: "Vallox Climate"
