@@ -542,15 +542,15 @@ void Vallox::statusChangedCallback() {
     // publish climate component values
     this->target_temperature = getHeatingTarget();
     this->custom_fan_mode = (optional<std::string>) to_string(getFanSpeed());
-    this->mode = (isHeatingMode()) ? climate::CLIMATE_MODE_HEAT : climate::CLIMATE_MODE_FAN_ONLY ;
-    this->action = (isHeatingMode()) ? climate::CLIMATE_ACTION_HEATING : climate::CLIMATE_ACTION_FAN ;
+    this->mode = (isOn()) ? ( (isHeatingMode()) ? climate::CLIMATE_MODE_HEAT : climate::CLIMATE_MODE_FAN_ONLY ) : climate::CLIMATE_MODE_OFF ;
+    this->action = (isOn()) ? ( (isHeatingMode()) ? climate::CLIMATE_ACTION_HEATING : climate::CLIMATE_ACTION_FAN ) : climate::CLIMATE_ACTION_OFF ;
     this->publish_state();
     // publish sensor components
     if (x_vallox_outside != nullptr)            x_vallox_outside->publish_state(getOutsideTemp());
     if (x_vallox_inside != nullptr)             x_vallox_inside->publish_state(getInsideTemp());
     if (x_vallox_incoming != nullptr)           x_vallox_incoming->publish_state(getIncomingTemp());
     if (x_vallox_exhaust != nullptr)            x_vallox_exhaust->publish_state(getExhaustTemp());
-    if (x_vallox_speed != nullptr)              x_vallox_speed->publish_state(getFanSpeed());
+    if (x_vallox_speed != nullptr)              x_vallox_speed->publish_state((isOn()) ? getFanSpeed() : 0 );
     if (x_vallox_default_fan_speed != nullptr)  x_vallox_default_fan_speed->publish_state(getDefaultFanSpeed());
     if (x_vallox_service_period != nullptr)     x_vallox_service_period->publish_state(getServicePeriod());
     if (x_vallox_service_counter != nullptr)    x_vallox_service_counter->publish_state(getServiceCounter());
