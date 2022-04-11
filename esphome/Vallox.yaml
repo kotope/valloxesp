@@ -2,6 +2,10 @@ esphome:
   includes:
     - Vallox.h
 
+# on ESP-01 switch UART debug port to unavailable GPIOs (otherwise debug output is corrupting RS485 bus), alternative option: remove logger: component
+logger:
+  hardware_uart: UART0_SWAP
+
 uart:
   id: uart_bus
   tx_pin: D1
@@ -58,12 +62,12 @@ sensor:
 text_sensor:
   - platform: template
     id: vallox_switch_type
-    name: vallox_switch_type    
+    name: vallox_switch_type
 
 binary_sensor:
   - platform: template
     id: vallox_switch_active
-    name: vallox_switch_active  
+    name: vallox_switch_active
   - platform: template
     id: vallox_heating
     name: vallox_heating
