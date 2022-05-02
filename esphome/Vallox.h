@@ -157,6 +157,8 @@ class Vallox : public Component, public UARTDevice, public Climate {
     Sensor          *x_vallox_service_period     {nullptr};
     Sensor          *x_vallox_service_counter    {nullptr};
     Sensor          *x_vallox_heat_target        {nullptr};
+    Sensor          *x_vallox_rh1                {nullptr};
+    Sensor          *x_vallox_rh2                {nullptr};
     TextSensor      *x_vallox_switch_type        {nullptr};
     BinarySensor    *x_vallox_switch_active      {nullptr};
     BinarySensor    *x_vallox_heating            {nullptr};
@@ -185,6 +187,8 @@ class Vallox : public Component, public UARTDevice, public Climate {
         Sensor *vallox_service_period,
         Sensor *vallox_service_counter,
         Sensor *vallox_heat_target,
+        Sensor *vallox_rh1,
+        Sensor *vallox_rh2,
         TextSensor *vallox_switch_type,
         BinarySensor *vallox_switch_active,
         BinarySensor *vallox_heating,
@@ -206,6 +210,8 @@ class Vallox : public Component, public UARTDevice, public Climate {
             x_vallox_service_period(vallox_service_period),
             x_vallox_service_counter(vallox_service_counter),
             x_vallox_heat_target(vallox_heat_target),
+            x_vallox_rh1(vallox_rh1),
+            x_vallox_rh2(vallox_rh2),
             x_vallox_switch_type(vallox_switch_type),
             x_vallox_switch_active(vallox_switch_active),
             x_vallox_heating(vallox_heating),
@@ -555,6 +561,8 @@ void Vallox::statusChangedCallback() {
     if (x_vallox_service_period != nullptr)     x_vallox_service_period->publish_state(getServicePeriod());
     if (x_vallox_service_counter != nullptr)    x_vallox_service_counter->publish_state(getServiceCounter());
     if (x_vallox_heat_target != nullptr)        x_vallox_heat_target->publish_state(getHeatingTarget());
+    if (x_vallox_rh2 != nullptr)                x_vallox_rh1->publish_state((getRh1() == NOT_SET) ? NAN : getRh1());
+    if (x_vallox_rh2 != nullptr)                x_vallox_rh2->publish_state((getRh2() == NOT_SET) ? NAN : getRh2());
     if (x_vallox_switch_active != nullptr)      x_vallox_switch_active->publish_state(isSwitchActive());
     if (x_vallox_switch_type != nullptr)        x_vallox_switch_type->publish_state((getSwitchType() == 1) ? "boost" : "fireplace");
     if (x_vallox_heating != nullptr)            x_vallox_heating->publish_state(isHeating());

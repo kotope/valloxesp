@@ -2,9 +2,9 @@ esphome:
   includes:
     - Vallox.h
 
-# on ESP-01 switch UART debug port to unavailable GPIOs (otherwise debug output is corrupting RS485 bus), alternative option: remove logger: component
+# On ESP-01: disable UART logging as UART already used for communication, API logging will still work
 logger:
-  hardware_uart: UART0_SWAP
+  baud_rate: 0
 
 uart:
   id: uart_bus
@@ -12,26 +12,31 @@ uart:
   rx_pin: D2
   baud_rate: 9600
 
+
 sensor:
 ## temperature sensors
   - platform: template
     id: vallox_outside
     name: vallox_outside
+    device_class: temperature
     unit_of_measurement: "°C"
     accuracy_decimals: 0
   - platform: template
     id: vallox_inside
     name: vallox_inside
+    device_class: temperature
     unit_of_measurement: "°C"
     accuracy_decimals: 0
   - platform: template
     id: vallox_incoming
     name: vallox_incoming
+    device_class: temperature
     unit_of_measurement: "°C"
     accuracy_decimals: 0
   - platform: template
     id: vallox_exhaust
     name: vallox_exhaust
+    device_class: temperature
     unit_of_measurement: "°C"
     accuracy_decimals: 0
 ## misc sensors
@@ -56,8 +61,17 @@ sensor:
   - platform: template
     id: vallox_heat_target
     name: vallox_heat_target
+    device_class: temperature
     unit_of_measurement: "°C"
     accuracy_decimals: 0
+  - platform: template
+    id: vallox_rh1
+    name: vallox_rh1
+    device_class: humidity
+  - platform: template
+    id: vallox_rh2
+    name: vallox_rh2
+    device_class: humidity
 
 text_sensor:
   - platform: template
@@ -110,6 +124,8 @@ climate:
       id(vallox_service_period),
       id(vallox_service_counter),
       id(vallox_heat_target),
+      id(vallox_rh1),
+      id(vallox_rh2),
       id(vallox_switch_type),
       id(vallox_switch_active),
       id(vallox_heating),
@@ -126,3 +142,5 @@ climate:
     return {my_vallox};
   climates:
     - name: "Vallox Climate"
+
+
