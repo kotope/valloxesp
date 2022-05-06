@@ -170,8 +170,8 @@ class Vallox : public Component, public UARTDevice, public Climate {
     BinarySensor    *x_vallox_motor_in           {nullptr};
     BinarySensor    *x_vallox_motor_out          {nullptr};
     BinarySensor    *x_vallox_front_heating      {nullptr};
-      
-      
+
+
  public:
 
 
@@ -252,7 +252,7 @@ class Vallox : public Component, public UARTDevice, public Climate {
 // CLIMATE
 
   void control(const ClimateCall &call) override;
-  
+
   ClimateTraits traits() override;
 
   climate::ClimateTraits traits_;
@@ -263,7 +263,7 @@ class Vallox : public Component, public UARTDevice, public Climate {
 
     // get data from cache
     unsigned long getUpdated(); // time when data was last updated
-    
+
     int getInsideTemp();
     int getOutsideTemp();
     int getIncomingTemp();
@@ -283,7 +283,7 @@ class Vallox : public Component, public UARTDevice, public Climate {
     boolean isFault();
     boolean isServiceNeeded();
     boolean isSwitchActive();
-    
+
     int getFanSpeed();
     int getDefaultFanSpeed();
     int getRh1();
@@ -309,14 +309,14 @@ class Vallox : public Component, public UARTDevice, public Climate {
     void setHeatingTarget(int temp);
 
     void setSwitchOn(); // Sets boost/fireplace on
-    
+
     boolean isInitOk();
 
     void packetCallback();
     void statusChangedCallback();
     void temperatureChangedCallback();
     void debugPrintCallback(String message);
-  
+
 
 //  private:
 
@@ -333,7 +333,7 @@ class Vallox : public Component, public UARTDevice, public Climate {
 
     // lock program variable (prevent sending and overriding different values until we have received the last)
     boolean programMutex = false;
-    
+
     // Status data cache
     struct {
       unsigned long updated;
@@ -363,7 +363,7 @@ class Vallox : public Component, public UARTDevice, public Climate {
       booleanValue is_front_heating;
       booleanValue is_out_motor;
       booleanValue is_extra_func;
-   
+
       intValue fan_speed;
       intValue default_fan_speed;
 
@@ -381,19 +381,19 @@ class Vallox : public Component, public UARTDevice, public Climate {
     } data;
 
     // Settings data cache
-    struct { 
+    struct {
       booleanValue is_boost_setting; // boost (1) or fireplace (0)
-     
+
       intValue program; // full program (0xAA) message
     } settings;
-    
+
     // Status setter
     boolean setStatusVariable(byte variable, byte value);
 
     // generic setter
     void setVariable(byte variable, byte value, byte target);
     void setVariable(byte variable, byte value);
-  
+
     // requests
     void sendStatusReq();
     void sendIO08Req();
@@ -442,10 +442,10 @@ class Vallox : public Component, public UARTDevice, public Climate {
 
     bool isStatusInitDone(); // Checks that all init poll requests has been done
     bool isTemperatureInitDone(); // Checks that all temperature values has been received at once
-    
+
     void checkStatusChange(boolean* oldValue, boolean newValue);
     void checkStatusChange(int* oldValue, int newValue);
-    
+
     void checkTemperatureChange(int* oldValue, int newValue);
     void checkTemperatureChange(int *oldValue, int newValue, unsigned long* lastReceived);
 
@@ -561,7 +561,7 @@ void Vallox::statusChangedCallback() {
     if (x_vallox_service_period != nullptr)     x_vallox_service_period->publish_state(getServicePeriod());
     if (x_vallox_service_counter != nullptr)    x_vallox_service_counter->publish_state(getServiceCounter());
     if (x_vallox_heat_target != nullptr)        x_vallox_heat_target->publish_state(getHeatingTarget());
-    if (x_vallox_rh2 != nullptr)                x_vallox_rh1->publish_state((getRh1() == NOT_SET) ? NAN : getRh1());
+    if (x_vallox_rh1 != nullptr)                x_vallox_rh1->publish_state((getRh1() == NOT_SET) ? NAN : getRh1());
     if (x_vallox_rh2 != nullptr)                x_vallox_rh2->publish_state((getRh2() == NOT_SET) ? NAN : getRh2());
     if (x_vallox_switch_active != nullptr)      x_vallox_switch_active->publish_state(isSwitchActive());
     if (x_vallox_switch_type != nullptr)        x_vallox_switch_type->publish_state((getSwitchType() == 1) ? "boost" : "fireplace");
@@ -985,7 +985,7 @@ void Vallox::decodeMessage(const byte message[]) {
   }
 
   // RH
-  else if (variable == VX_VARIABLE_RH1) { 
+  else if (variable == VX_VARIABLE_RH1) {
     checkTemperatureChange(&(data.rh1.value), hex2Rh(value), &(data.rh1.lastReceived));
   } else if (variable == VX_VARIABLE_RH2) {
     checkTemperatureChange(&(data.rh2.value), hex2Rh(value), &(data.rh2.lastReceived));
