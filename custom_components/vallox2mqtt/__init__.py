@@ -5,8 +5,9 @@ import json
 import asyncio
 
 from homeassistant.components.mqtt import (
-    CONF_STATE_TOPIC, CONF_COMMAND_TOPIC, CONF_QOS, CONF_RETAIN,
+    CONF_STATE_TOPIC, CONF_COMMAND_TOPIC, CONF_QOS,
     subscription)
+from homeassistant.components.mqtt.const import CONF_RETAIN
 from homeassistant.const import (
     CONF_NAME, CONF_VALUE_TEMPLATE, TEMP_CELSIUS, ATTR_TEMPERATURE)
 from homeassistant.components.mqtt.climate import (
