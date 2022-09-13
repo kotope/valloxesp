@@ -2,18 +2,24 @@
 // (c) Toni Korhonen 2020
 // https://www.creatingsmarthome.com/?p=73
 
+#ifdef ESP32
+#include <WiFi.h>
+#include <ESPmDNS.h>
+#else
 #include <ESP8266WiFi.h>
+#include <ESP8266mDNS.h>
+#endif
+
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 #include <ArduinoOTA.h>
-#include <ESP8266mDNS.h>
 #include "valloxesp.h"
 #include "Vallox.h"
 
 #define JSON_BUFFER_LENGTH 2048
 #define DEBUG false // default value for debug
 
-#define VALLOXESP_VERSION "0.8.2" // this version
+#define VALLOXESP_VERSION "0.9.0" // this version
 
 // Callbacks
 void mqttCallback(char* topic, byte* payload, unsigned int payloadLength);
@@ -56,7 +62,10 @@ void loop() {
     mqttConnect();
   }
 
+#ifndef ESP32
   MDNS.update();
+#endif
+
   ArduinoOTA.handle();
 }
 
