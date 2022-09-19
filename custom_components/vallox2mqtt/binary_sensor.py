@@ -19,11 +19,6 @@ from .const import (NAME, VERSION, MANUFACTURER)
 
 _LOGGER = logging.getLogger(__name__)
 
-# TODO: Remove this old style shit
-#def setup_platform(hass, config, add_entities, discovery_info=None):
-#    """Set up the sensor platform."""
-#    add_entities([ValloxDigitBinarySensor(hass)])
-
 async def async_setup_entry(hass, entry, async_add_devices):
     """Setup sensor platform."""
     async_add_devices([
@@ -31,7 +26,8 @@ async def async_setup_entry(hass, entry, async_add_devices):
       ValloxDigitAttributedBinarySensor(hass, entry, "Motor In", 'motor_in'),
       ValloxDigitAttributedBinarySensor(hass, entry, "Motor Out", 'motor_out'),
       ValloxDigitAttributedBinarySensor(hass, entry, "Summer Mode", 'summer_mode'),
-      ValloxDigitAttributedBinarySensor(hass, entry, "Front Heating", 'front_heating')
+      ValloxDigitAttributedBinarySensor(hass, entry, "Front Heating", 'front_heating'),
+      ValloxDigitAttributedBinarySensor(hass, entry, "Service Needed", 'service_needed')
    ])
 
 class ValloxDigitBinarySensor(BinarySensorEntity):
