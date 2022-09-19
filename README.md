@@ -12,6 +12,7 @@ https://github.com/dirtyha/my-esp8266/tree/master/Vallox
 - Vallox 110 SE
 - Vallox 121 SE (version without front heating module)
 - Vallox 121 SE (version with front heating)
+- Vallox 150 SE
 - Vallox Digit SE
 - Vallox Digit SE 2
 - Vallox ValloPlus 350 SE
