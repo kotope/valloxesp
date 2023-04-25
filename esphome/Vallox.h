@@ -16,6 +16,7 @@
 #define VX_VARIABLE_FLAGS_06 0x71
 #define VX_VARIABLE_HEATING_STATUS 0x07 // TODO: Not yet implemented
 #define VX_VARIABLE_PROGRAM 0xAA
+#define VX_VARIABLE_T_HEAT_RECOVERY 0xAF
 
 // status flags of variable A3
 #define VX_STATUS_FLAG_POWER 0x01           // bit 0 read/write
@@ -159,6 +160,7 @@ class Vallox : public Component, public UARTDevice, public Climate {
     Sensor          *x_vallox_heat_target        {nullptr};
     Sensor          *x_vallox_rh1                {nullptr};
     Sensor          *x_vallox_rh2                {nullptr};
+    Number          *x_vallox_t_heat_recovery    {nullptr};
     TextSensor      *x_vallox_switch_type        {nullptr};
     BinarySensor    *x_vallox_switch_active      {nullptr};
     BinarySensor    *x_vallox_heating            {nullptr};
@@ -189,6 +191,7 @@ class Vallox : public Component, public UARTDevice, public Climate {
         Sensor *vallox_heat_target,
         Sensor *vallox_rh1,
         Sensor *vallox_rh2,
+        Number *vallox_t_heat_recovery,
         TextSensor *vallox_switch_type,
         BinarySensor *vallox_switch_active,
         BinarySensor *vallox_heating,
@@ -212,6 +215,7 @@ class Vallox : public Component, public UARTDevice, public Climate {
             x_vallox_heat_target(vallox_heat_target),
             x_vallox_rh1(vallox_rh1),
             x_vallox_rh2(vallox_rh2),
+            x_vallox_t_heat_recovery(vallox_t_heat_recovery),
             x_vallox_switch_type(vallox_switch_type),
             x_vallox_switch_active(vallox_switch_active),
             x_vallox_heating(vallox_heating),
@@ -245,7 +249,6 @@ class Vallox : public Component, public UARTDevice, public Climate {
 
 
   void loop() override;
-
 
 
 
@@ -288,6 +291,7 @@ class Vallox : public Component, public UARTDevice, public Climate {
     int getDefaultFanSpeed();
     int getRh1();
     int getRh2();
+    int getHeatRecoveryBypassTemp();
     int getServicePeriod();
     int getServiceCounter();
     int getHeatingTarget();
@@ -307,6 +311,7 @@ class Vallox : public Component, public UARTDevice, public Climate {
     void setServicePeriod(int months);
     void setServiceCounter(int months);
     void setHeatingTarget(int temp);
+    void setHeatRecoveryBypassTemp(int temp);
 
     void setSwitchOn(); // Sets boost/fireplace on
 
@@ -355,6 +360,9 @@ class Vallox : public Component, public UARTDevice, public Climate {
       // RH
       intValue rh1;
       intValue rh2;
+
+      // Heat recovery setting
+      intValue t_heat_recovery_bypass;
 
       // 08 variables
       booleanValue is_summer_mode;
@@ -407,6 +415,7 @@ class Vallox : public Component, public UARTDevice, public Climate {
     void sendServicePeriodReq();
     void sendHeatingTargetReq();
     void sendRhReq();
+    void sendHeatRecoveryTempReq();
     void sendServiceCounterReq();
     void sendProgramReq();
 
@@ -453,7 +462,6 @@ class Vallox : public Component, public UARTDevice, public Climate {
 
 
 };
-
 
 // CLIMATE
 
@@ -563,6 +571,7 @@ void Vallox::statusChangedCallback() {
     if (x_vallox_heat_target != nullptr)        x_vallox_heat_target->publish_state(getHeatingTarget());
     if (x_vallox_rh1 != nullptr)                x_vallox_rh1->publish_state((getRh1() == NOT_SET) ? NAN : getRh1());
     if (x_vallox_rh2 != nullptr)                x_vallox_rh2->publish_state((getRh2() == NOT_SET) ? NAN : getRh2());
+    if (x_vallox_t_heat_recovery != nullptr)    x_vallox_t_heat_recovery->publish_state(getHeatRecoveryBypassTemp());
     if (x_vallox_switch_active != nullptr)      x_vallox_switch_active->publish_state(isSwitchActive());
     if (x_vallox_switch_type != nullptr)        x_vallox_switch_type->publish_state((getSwitchType() == 1) ? "boost" : "fireplace");
     if (x_vallox_heating != nullptr)            x_vallox_heating->publish_state(isHeating());
@@ -702,6 +711,15 @@ void Vallox::setHeatingTarget(int cel) {
   }
 }
 
+void Vallox::setHeatRecoveryBypassTemp(int cel) {
+  if (cel >= 0 && cel <= 20) { // panel allows 0-20
+    byte hex = cel2Ntc(cel);
+    setVariable(VX_VARIABLE_T_HEAT_RECOVERY, hex);
+    data.t_heat_recovery_bypass.value = cel;
+    statusChangedCallback();
+  }
+}
+
 void Vallox::setSwitchOn() {
   // Activate boost/fireplace
   setVariable(VX_VARIABLE_FLAGS_06, data.flags06.value | VX_06_FIREPLACE_FLAG_ACTIVATE);
@@ -812,6 +830,10 @@ int Vallox::getRh2() {
   return data.rh2.value;
 }
 
+int Vallox::getHeatRecoveryBypassTemp() {
+  return data.t_heat_recovery_bypass.value;
+}
+
 int Vallox::getHeatingTarget() {
   return data.heating_target.value;
 }
@@ -881,6 +903,10 @@ void Vallox::sendServiceCounterReq() {
 
 void Vallox::sendRhReq() {
   requestVariable(VX_VARIABLE_RH1);
+}
+
+void Vallox::sendHeatRecoveryTempReq() {
+  requestVariable(VX_VARIABLE_T_HEAT_RECOVERY);
 }
 
 // set generic variable value in all mainboards and panels
@@ -1013,6 +1039,9 @@ void Vallox::decodeMessage(const byte message[]) {
   } else if (variable == VX_VARIABLE_HEATING_TARGET) {
     data.heating_target.lastReceived = millis();
     checkStatusChange(&(data.heating_target.value), ntc2Cel(value));
+  } else if (variable == VX_VARIABLE_T_HEAT_RECOVERY) {
+    data.t_heat_recovery_bypass.lastReceived = millis();
+    checkStatusChange(&(data.t_heat_recovery_bypass.value), ntc2Cel(value));
   } else if (variable == VX_VARIABLE_PROGRAM) {
     decodeProgram(value);
   } else {
@@ -1268,6 +1297,7 @@ void Vallox::sendMissingRequests() {
   if (!data.service_period.lastReceived) sendServicePeriodReq();
   if (!data.service_counter.lastReceived) sendServiceCounterReq();
   if (!data.heating_target.lastReceived) sendHeatingTargetReq();
+  if (!data.t_heat_recovery_bypass.lastReceived) sendHeatRecoveryTempReq();
 }
 
 boolean Vallox::isTemperatureInitDone() {
