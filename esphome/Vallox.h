@@ -67,6 +67,8 @@
 #define VX_MSG_LENGTH 6
 #define VX_MSG_DOMAIN 0x01
 #define VX_MSG_POLL_BYTE 0x00
+#define VX_REPLY_WAIT_TIME 10
+#define VX_MAX_RETRIES 10
 #define NOT_SET -999
 #define QUERY_INTERVAL 300000 // in ms (5min)
 #define RETRY_INTERVAL 5000 // in ms (5 sec)
@@ -160,6 +162,7 @@ class Vallox : public Component, public UARTDevice, public Climate {
     Sensor          *x_vallox_heat_target        {nullptr};
     Sensor          *x_vallox_rh1                {nullptr};
     Sensor          *x_vallox_rh2                {nullptr};
+    Sensor          *x_vallox_diag_retries       {nullptr};
     Number          *x_vallox_t_heat_recovery    {nullptr};
     TextSensor      *x_vallox_switch_type        {nullptr};
     BinarySensor    *x_vallox_switch_active      {nullptr};
@@ -191,6 +194,7 @@ class Vallox : public Component, public UARTDevice, public Climate {
         Sensor *vallox_heat_target,
         Sensor *vallox_rh1,
         Sensor *vallox_rh2,
+        Sensor *vallox_diag_retries,
         Number *vallox_t_heat_recovery,
         TextSensor *vallox_switch_type,
         BinarySensor *vallox_switch_active,
@@ -215,6 +219,7 @@ class Vallox : public Component, public UARTDevice, public Climate {
             x_vallox_heat_target(vallox_heat_target),
             x_vallox_rh1(vallox_rh1),
             x_vallox_rh2(vallox_rh2),
+            x_vallox_diag_retries(vallox_diag_retries),
             x_vallox_t_heat_recovery(vallox_t_heat_recovery),
             x_vallox_switch_type(vallox_switch_type),
             x_vallox_switch_active(vallox_switch_active),
@@ -339,6 +344,12 @@ class Vallox : public Component, public UARTDevice, public Climate {
     // lock program variable (prevent sending and overriding different values until we have received the last)
     boolean programMutex = false;
 
+    // diagnostics cache
+    struct {
+      int retries = 0;
+      int retries_published = -1;
+    } diag;
+
     // Status data cache
     struct {
       unsigned long updated;
@@ -395,10 +406,13 @@ class Vallox : public Component, public UARTDevice, public Climate {
       intValue program; // full program (0xAA) message
     } settings;
 
-    // Status setter
+    // Status setter with statusmutex logic, retries if not acknowledged
     boolean setStatusVariable(byte variable, byte value);
 
-    // generic setter
+    // this setter retries if not acknowledged
+    void setVariableConfirmed(byte variable, byte value);
+
+    // generic setter, shoot and forget, no retries
     void setVariable(byte variable, byte value, byte target);
     void setVariable(byte variable, byte value);
 
@@ -539,6 +553,13 @@ void Vallox::loop() {
       sendServiceCounterReq();
       sendStatusReq();
     }
+
+    // update diagnostics every query interval too
+    if (diag.retries > diag.retries_published) {
+      if (x_vallox_diag_retries != nullptr)
+        x_vallox_diag_retries->publish_state(diag.retries);
+      diag.retries_published = diag.retries;
+    }
   }
 
   if (now - lastRetryLoop > RETRY_INTERVAL) {
@@ -603,7 +624,7 @@ void Vallox::debugPrintCallback(String message) {
 // these will set data both in the bus and cache
 void Vallox::setFanSpeed(int speed) {
   if (speed <= VX_MAX_FAN_SPEED) {
-    setVariable(VX_VARIABLE_FAN_SPEED, fanSpeed2Hex(speed));
+    setVariableConfirmed(VX_VARIABLE_FAN_SPEED, fanSpeed2Hex(speed));
     data.fan_speed.value = speed;
     statusChangedCallback();
   }
@@ -686,6 +707,13 @@ boolean Vallox::setStatusVariable(byte variable, byte value) {
   return false;
 }
 
+// this is similar to setStatusVariable(), but does not set the statusMutex
+void Vallox::setVariableConfirmed(byte variable, byte value) {
+  // when set is targeted to specific mainboard instead of group address,
+  // the receiver will acknowledge it
+  setVariable(variable, value, VX_MSG_MAINBOARD_1);
+}
+
 void Vallox::setServicePeriod(int months) {
   if (months >= 0 && months < 256) {
     setVariable(VX_VARIABLE_SERVICE_PERIOD, months);
@@ -714,7 +742,7 @@ void Vallox::setHeatingTarget(int cel) {
 void Vallox::setHeatRecoveryBypassTemp(int cel) {
   if (cel >= 0 && cel <= 20) { // panel allows 0-20
     byte hex = cel2Ntc(cel);
-    setVariable(VX_VARIABLE_T_HEAT_RECOVERY, hex);
+    setVariableConfirmed(VX_VARIABLE_T_HEAT_RECOVERY, hex);
     data.t_heat_recovery_bypass.value = cel;
     statusChangedCallback();
   }
@@ -926,6 +954,34 @@ void Vallox::setVariable(byte variable, byte value, byte target) {
   // send to all mainboards
   for (int i = 0; i < VX_MSG_LENGTH; i++) {
     write(message[i]);
+  }
+
+  if (target == VX_MSG_MAINBOARD_1) { // check for reply and retry if needed
+    boolean reply = false;
+    byte received;
+    for (int i = 0; i < VX_MAX_RETRIES; i++) {
+      delay(VX_REPLY_WAIT_TIME);
+      while (available()) {
+        received = read();
+        if (received == message[5]) { // ack is simply one byte containing the checksum
+          reply = true;
+          break;
+        }
+      }
+      if (!reply) {
+        if (diag.retries < INT_MAX)
+          diag.retries++;
+        ESP_LOGD("vallox","setVariable: no ack received in 10ms, retrying...");
+        for (int i = 0; i < VX_MSG_LENGTH; i++) {
+          write(message[i]);
+        }
+      } else
+        break;
+    }
+    if (!reply) {
+      ESP_LOGD("vallox","setVariable: ack NOT received after maximum retries!");
+      return; // no use echoing the setting to other panels when it was not acked
+    }
   }
 
   message[1] = VX_MSG_MAINBOARD_1;
@@ -1322,5 +1378,6 @@ boolean Vallox::isStatusInitDone() { // all initializations
     data.default_fan_speed.lastReceived &&
     data.service_period.lastReceived &&
     data.service_counter.lastReceived &&
+    data.t_heat_recovery_bypass.lastReceived &&
     data.heating_target.lastReceived;
 }

@@ -72,6 +72,19 @@ sensor:
     id: vallox_rh2
     name: vallox_rh2
     device_class: humidity
+## diagnostics
+  - platform: template
+    id: vallox_diag_retries
+    name: vallox_diag_retries
+    entity_category: diagnostic
+    accuracy_decimals: 0
+    unit_of_measurement: " "
+  - platform: uptime
+    id: vallox_diag_uptime
+    name: vallox_diag_uptime
+    entity_category: diagnostic
+    unit_of_measurement: "s"
+    accuracy_decimals: 0
 
 number:
   - platform: template
@@ -143,6 +156,7 @@ climate:
       id(vallox_heat_target),
       id(vallox_rh1),
       id(vallox_rh2),
+      id(vallox_diag_retries),
       id(vallox_t_heat_recovery),
       id(vallox_switch_type),
       id(vallox_switch_active),
