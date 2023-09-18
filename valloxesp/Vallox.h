@@ -21,6 +21,8 @@
 #define VX_MSG_THIS_PANEL 0x22 // This panel address, should not be same with other panel(s)
 #define VX_MSG_PANELS 0x20
 
+#define CO2_LIFE_TIME_MS 2000 // Maximum time that LO and HI bytes are considered to be the same value
+
 #define DEBUG_PRINT_CALLBACK_SIGNATURE std::function<void(String debugPrint)> debugPrintCallback
 #define PACKET_CALLBACK_SIGNATURE std::function<void(byte* packet, unsigned int length, char* packetDirection)> packetCallback
 #define STATUS_CHANGED_CALLBACK_SIGNATURE std::function<void()> statusChangedCallback
@@ -33,6 +35,11 @@ struct intValue {
 
 struct booleanValue {
   boolean value;
+  unsigned long lastReceived;
+};
+
+struct byteValue {
+  byte value;
   unsigned long lastReceived;
 };
     
@@ -81,6 +88,7 @@ class Vallox {
     int getDefaultFanSpeed();
     int getRh1();
     int getRh2();
+    int getCO2();
     int getServicePeriod();
     int getServiceCounter();
     int getHeatingTarget();
@@ -149,6 +157,12 @@ class Vallox {
       // RH
       intValue rh1;
       intValue rh2;
+
+      // CO2
+      byteValue co2_hi;
+      byteValue co2_lo;
+
+      intValue co2; // Combined from hi + lo bytes
 
       // 08 variables
       booleanValue is_summer_mode;
@@ -242,13 +256,17 @@ class Vallox {
     bool isStatusInitDone(); // Checks that all init poll requests has been done
     bool isTemperatureInitDone(); // Checks that all temperature values has been received at once
     
+    // Checks if status has been changed (heating mode, etc..)
     void checkStatusChange(boolean* oldValue, boolean newValue);
     void checkStatusChange(int* oldValue, int newValue);
     
-    void checkTemperatureChange(int* oldValue, int newValue);
-    void checkTemperatureChange(int *oldValue, int newValue, unsigned long* lastReceived);
+    // Checks if a push value has been changed (temp, CO2, RH)
+    void checkValueChange(int* oldValue, int newValue);
+    void checkValueChange(int *oldValue, int newValue, unsigned long* lastReceived);
 
     void checkSettingsChange(boolean* oldValue, boolean newValue);
+
+    void handleCo2TotalValue(byte hi, byte low);
 };
 
 #endif

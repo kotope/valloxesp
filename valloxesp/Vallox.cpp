@@ -355,6 +355,13 @@ int Vallox::getRh2() {
   return data.rh2.value;
 }
 
+int Vallox::getCO2() {
+  if (!data.co2.lastReceived) {
+    return NOT_SET;
+  }
+  return data.co2.value;
+}
+
 int Vallox::getHeatingTarget() {
   return data.heating_target.value;
 }
@@ -530,20 +537,36 @@ void Vallox::decodeMessage(const byte message[]) {
 
   // Temperature (status object)
   if (variable == VX_VARIABLE_T_OUTSIDE) { // OUTSIDE
-    checkTemperatureChange(&(data.t_outside.value), ntc2Cel(value), &(data.t_outside.lastReceived));
+    checkValueChange(&(data.t_outside.value), ntc2Cel(value), &(data.t_outside.lastReceived));
   } else if (variable == VX_VARIABLE_T_EXHAUST) { // EXHAUST
-    checkTemperatureChange(&(data.t_exhaust.value), ntc2Cel(value), &(data.t_exhaust.lastReceived));
+    checkValueChange(&(data.t_exhaust.value), ntc2Cel(value), &(data.t_exhaust.lastReceived));
   } else if (variable == VX_VARIABLE_T_INSIDE) { // INSIDE
-    checkTemperatureChange(&(data.t_inside.value), ntc2Cel(value), &(data.t_inside.lastReceived));
+    checkValueChange(&(data.t_inside.value), ntc2Cel(value), &(data.t_inside.lastReceived));
   } else if (variable == VX_VARIABLE_T_INCOMING) { // INCOMING
-    checkTemperatureChange(&(data.t_incoming.value), ntc2Cel(value), &(data.t_incoming.lastReceived));
+    checkValueChange(&(data.t_incoming.value), ntc2Cel(value), &(data.t_incoming.lastReceived));
   }
 
   // RH
   else if (variable == VX_VARIABLE_RH1) { 
-    checkTemperatureChange(&(data.rh1.value), hex2Rh(value), &(data.rh1.lastReceived));
+    checkValueChange(&(data.rh1.value), hex2Rh(value), &(data.rh1.lastReceived));
   } else if (variable == VX_VARIABLE_RH2) {
-    checkTemperatureChange(&(data.rh2.value), hex2Rh(value), &(data.rh2.lastReceived));
+    checkValueChange(&(data.rh2.value), hex2Rh(value), &(data.rh2.lastReceived));
+  }
+
+  // CO2
+  // Let's assume that the timeinterval for the same value is something pre-defined..
+  else if (variable == VX_VARIABLE_CO2_HI) {
+    data.co2_hi.lastReceived = millis();
+    data.co2_hi.value = value;
+    if (data.co2_lo.lastReceived > millis() - CO2_LIFE_TIME_MS) {
+      handleCo2TotalValue(data.co2_hi.value, data.co2_lo.value);
+    }
+  } else if (variable == VX_VARIABLE_CO2_LO) {
+    data.co2_lo.lastReceived = millis();
+    data.co2_lo.value = value;
+    if (data.co2_hi.lastReceived > millis() - CO2_LIFE_TIME_MS) {
+      handleCo2TotalValue(data.co2_hi.value, data.co2_lo.value);
+    }
   }
 
   // Others (config object)
@@ -629,7 +652,6 @@ void Vallox::decodeProgram(byte program) {
 
   checkSettingsChange(&(settings.is_boost_setting.value), (program & VX_PROGRAM_SWITCH_TYPE) != 0x00);
 
-  // TODO:
   if (shoudInformCallback) {
     // Never received, publish
     statusChangedCallback();
@@ -685,14 +707,15 @@ void Vallox::checkStatusChange(int* oldValue, int newValue) {
 
 //
 // Temperature change
-void Vallox::checkTemperatureChange(int *oldValue, int newValue, unsigned long *lastReceived) {
+void Vallox::checkValueChange(int *oldValue, int newValue, unsigned long *lastReceived) {
   unsigned long now = millis();
 
   *lastReceived = now;
-  checkTemperatureChange(oldValue, newValue);
+  checkValueChange(oldValue, newValue);
 }
 
-void Vallox::checkTemperatureChange(int* oldValue, int newValue) {
+// Check for value change (Temperature, CO2, RH)
+void Vallox::checkValueChange(int* oldValue, int newValue) {
   if (checkChange(oldValue, newValue) && isTemperatureInitDone()) { // Do not publish status, until base values has been received
     temperatureChangedCallback();
   }
@@ -848,4 +871,10 @@ boolean Vallox::isStatusInitDone() { // all initializations
     data.service_period.lastReceived &&
     data.service_counter.lastReceived &&
     data.heating_target.lastReceived;
+}
+
+void Vallox::handleCo2TotalValue(byte hi, byte low) {
+  // Construct co2 value from hi and lo bytes
+  uint16_t total = low + (hi << 8);
+  checkValueChange(&(data.co2.value), total, &(data.co2.lastReceived));
 }
