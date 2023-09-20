@@ -13,6 +13,7 @@ https://github.com/dirtyha/my-esp8266/tree/master/Vallox
 - Vallox 121 SE (version without front heating module)
 - Vallox 121 SE (version with front heating)
 - Vallox 150 SE
+- Vallox 270 SE
 - Vallox Digit SE
 - Vallox Digit SE 2
 - Vallox ValloPlus 350 SE
@@ -25,6 +26,7 @@ Contained entities:
 * sensor: switch type to see if switch is configured as fireplace or boost
 * sensors: outside, inside, exhaust and incoming temperatures
 * sensors: rh1 and rh2 if supported by your Vallox Ventilation machine
+* sensor: co2 if supported by your Vallox Ventilation machine
 * binary sensors: motor in/motor out statuses
 * binary sensor: summer mode
 * sensor: service counter (how many months until you have to replace your filters)

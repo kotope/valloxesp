@@ -19,7 +19,7 @@
 #define JSON_BUFFER_LENGTH 2048
 #define DEBUG false // default value for debug
 
-#define VALLOXESP_VERSION "0.9.0" // this version
+#define VALLOXESP_VERSION "1.0.0" // this version
 
 // Callbacks
 void mqttCallback(char* topic, byte* payload, unsigned int payloadLength);
@@ -233,6 +233,10 @@ void publishTemperatures() {
 
   if(vx.getRh2() != NOT_SET) {
     root["rh_2"] = vx.getRh2();
+  }
+
+  if(vx.getCO2() != NOT_SET) {
+    root["co2"] = vx.getCO2();
   }
 
   String mqttOutput;

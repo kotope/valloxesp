@@ -18,6 +18,12 @@
 #define VX_VARIABLE_HEATING_STATUS 0x07 // TODO: Not yet implemented
 #define VX_VARIABLE_PROGRAM 0xAA
 
+// Order of these two seems to be that the panel first queries for LO and then HI
+// Query interval is something like 5s by the panel..
+#define VX_VARIABLE_CO2_HI 0x2B
+#define VX_VARIABLE_CO2_LO 0x2C
+
+
 // status flags of variable A3
 #define VX_STATUS_FLAG_POWER 0x01           // bit 0 read/write
 #define VX_STATUS_FLAG_CO2 0x02             // bit 1 read/write

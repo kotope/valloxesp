@@ -25,6 +25,7 @@ async def async_setup_entry(hass, entry, async_add_devices):
       ValloxDigitAttributedSensor(hass, entry, "RH 2", 'rh_2', "%", "mdi:water-percent"),
       ValloxDigitAttributedSensor(hass, entry, "Service Counter", 'service_counter', "Months"),
       ValloxDigitAttributedSensor(hass, entry, "Switch Type", 'switch_type', ""),
+      ValloxDigitAttributedSensor(hass, entry, "CO2", 'co2', "ppm", "mdi:molecule-co2"),
    ])
 
 class ValloxDigitSensor(Entity):
