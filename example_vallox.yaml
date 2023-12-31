@@ -1,0 +1,117 @@
+external_components:
+## only needed if you copy code locally into your esphome directory, see https://esphome.io/components/external_components.html#external-components-local
+# - source:
+#     type: local
+#     path: components
+#   components: [ vallox ]
+## recommended, just point to the appropriate branch
+  - source: github://kotope/valloxesp@esphome
+    components: [ vallox ]
+
+
+uart:
+  id: uart_bus
+  tx_pin: TX
+  rx_pin: RX
+  baud_rate: 9600
+  data_bits: 8
+  parity: NONE
+  stop_bits: 1
+  #debug:
+  #  direction: BOTH
+  #  dummy_receiver: false
+  #  after:
+  #    bytes: 1
+
+ 
+climate:
+  - platform: vallox
+    name: ${devicename} climate
+    uart_id: uart_bus
+
+    visual:
+      min_temperature: 15
+      max_temperature: 25
+
+    # I don't have any heating element built in so it is just the heat exchanger and ventilation
+    # Thus, I enable the heat exchanger for "heating", basically by setting WRG bypass to 00 (i.e. summer mode at 0°C)
+    # and use heating_mode to control the bypass status (when heating_mode is on the heat exchanger turns on too, it can't be individually controlled)
+    # See ValloxVentilation::control function for details
+
+    # All sensors below are optional and can be added or left off, if you add a sensor, name is a required setting
+
+    # sensor for current fan speed (is also visible as custom fan mode in climate component)
+    fan_speed:
+      name: ${devicename} fan speed
+    # default fan speed (minimum fan speed)
+    fan_speed_default:
+      name: ${devicename} fan speed default
+    # temperature target, basically not used in my scenario other than having an indication for Home Assistant automations what temperature I would like to have (separate logic could be used with hystereses to heat/cool based on inside temperature and outside temperature)
+    temperature_target:
+      name: ${devicename} temperature target
+    # outside temperature
+    temperature_outside:
+      name: ${devicename} temperature outside
+    # inside temperature
+    temperature_inside:
+      name: ${devicename} temperature inside
+    # temperature of the exhaust (outgoing after heat exchanger (if active))
+    temperature_outgoing:
+      name: ${devicename} temperature outgoing
+    # temperature of the incoming air (incoming after heat exchanger (if active))
+    temperature_incoming:
+      name: ${devicename} temperature incoming
+    # humidity sensor #1 (don't have one)
+    humidity_1:
+      name: ${devicename} humidity 1
+    # humidity sensor #2 (don't have one)
+    humidity_2:
+      name: ${devicename} humidity 2
+    # co2 sensor (don't have one)
+    co2:
+      name: ${devicename} co2
+    # what type of action can be triggered using the momentary switch (fireplace/boost)  Kamin/Stoßlüftungstaster 
+    switch_type:
+      name: ${devicename} switch type
+    # Whether the ventilation is turned on
+    status_on:
+      name: ${devicename} status on
+    # Incoming motor running
+    status_motor_in:
+      name: ${devicename} status motor in
+    # outgoing motor running (gets disabled for example if you use switch_type fireplace)
+    status_motor_out:
+      name: ${devicename} status motor out
+    # the service interval (shown in months)
+    service_period:
+      name: ${devicename} service period
+    # the remaining months in this service interval
+    service_remaining:
+      name: ${devicename} service remaining
+    # gets active if you are past the service interval (you can reset the interval it in the menu of the control)
+    service_needed:
+      name: ${devicename} service needed
+    # if the switch (fireplace/boost) is currently active (boost might not make much sense if you already control the fan speed via Home Assistant, fireplace might be useful to disable the outgoing motor for 15 min)
+    switch_active:
+      name: ${devicename} switch active
+    # Heating element (i guess, don't have one built in)
+    heating:
+      name: ${devicename} heating
+    # heating mode (enabling this also disables any bypass aka summer_mode, see my comment on top)
+    heating_mode:
+      name: ${devicename} heating mode
+    # Another heating element (i guess, don't have one built in)
+    front_heating:
+      name: ${devicename} front heating
+    # whether the heat exchanger is bypassed (i.e. outside air comes in directly), aka WRG bypass
+    summer_mode:
+      name: ${devicename} summer mode
+    # Some problem with the device i guess?
+    problem:
+      name: ${devicename} problem
+    # Some error with some relay? no idea what that is..
+    error_relay:
+      name: ${devicename} error relay
+    # ... No idea... maybe just don't include that :)
+    extra_func:
+      name: ${devicename} extra func
