@@ -24,7 +24,8 @@
 #define NOT_SET -999
 #define QUERY_INTERVAL 300000 // in ms (5min)
 #define RETRY_INTERVAL 5000 // in ms (5 sec)
-#define VERIFY_INTERVAL 5000 // in ms (2 sec)
+#define VX_MAX_RETRIES 10
+#define VX_REPLY_WAIT_TIME 10
 
 // senders and receivers
 #define VX_MSG_MAINBOARD_1 0x11

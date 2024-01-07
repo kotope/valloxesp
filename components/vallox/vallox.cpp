@@ -123,7 +123,7 @@ namespace esphome {
 
 
 
-      
+
       boolean ValloxVentilation::setStatusVariable(byte variable, byte value) {
         if (!statusMutex) {
           statusMutex = true; // lock sending status again
@@ -370,13 +370,18 @@ namespace esphome {
 
 
 
-     // set generic variable value in all mainboards and panels
+     // set generic variable value in first and all mainboards (panels are informed in setVariable())
      void ValloxVentilation::setVariable(byte variable, byte value) {
+       setVariable(variable, value, VX_MSG_MAINBOARD_1);
        setVariable(variable, value, VX_MSG_MAINBOARDS);
      }
 
+
      void ValloxVentilation::setVariable(byte variable, byte value, byte target) {
        byte message[VX_MSG_LENGTH];
+       boolean reply = false;
+       byte received;
+
        message[0] = VX_MSG_DOMAIN;
        message[1] = VX_MSG_THIS_PANEL;
        message[2] = target;
@@ -386,14 +391,35 @@ namespace esphome {
 
        this->write_array(message, VX_MSG_LENGTH);
 
-       message[1] = VX_MSG_MAINBOARD_1;
-       message[2] = VX_MSG_PANELS;
-       message[5] = calculateCheckSum(message);
+       // only check for reply on non-broadcast messages
+       if ((target != VX_MSG_MAINBOARDS) && (target != VX_MSG_PANELS)) {
+         for (int i = 0; i < VX_MAX_RETRIES; i++) {
+           delay(VX_REPLY_WAIT_TIME);
+           while (this->available()) {
+             this->read_byte(&received);
+             if (received == message[5]) {
+               reply = true;
+               break;
+             }
+           }
+           if (!reply) {
+             // resend message
+             this->write_array(message, VX_MSG_LENGTH);
+           } else {
+             break;
+           }
+         }
+         if (!reply) { ESP_LOGD("vallox","ERROR: Giving up after not receiving reply"); }
+       }
 
-       // send to all panels
-       this->write_array(message, VX_MSG_LENGTH);
+       // send to all panels if received by mainboard, if target is broadcast, reply will remain false anyways, avoiding duplicate sending
+       if (reply) {
+         message[1] = VX_MSG_MAINBOARD_1;
+         message[2] = VX_MSG_PANELS;
+         message[5] = calculateCheckSum(message);
 
-       delay(10);
+         this->write_array(message, VX_MSG_LENGTH);
+       }
      }
 
 
