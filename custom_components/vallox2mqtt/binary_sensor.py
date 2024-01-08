@@ -27,7 +27,8 @@ async def async_setup_entry(hass, entry, async_add_devices):
       ValloxDigitAttributedBinarySensor(hass, entry, "Motor Out", 'motor_out'),
       ValloxDigitAttributedBinarySensor(hass, entry, "Summer Mode", 'summer_mode'),
       ValloxDigitAttributedBinarySensor(hass, entry, "Front Heating", 'front_heating'),
-      ValloxDigitAttributedBinarySensor(hass, entry, "Service Needed", 'service_needed')
+      ValloxDigitAttributedBinarySensor(hass, entry, "Service Needed", 'service_needed', 'problem'),
+      ValloxDigitAttributedBinarySensor(hass, entry, "Post Heating", 'heating')
    ])
 
 class ValloxDigitBinarySensor(BinarySensorEntity):
@@ -66,10 +67,11 @@ class ValloxDigitBinarySensor(BinarySensorEntity):
         )
 
 class ValloxDigitAttributedBinarySensor(ValloxDigitBinarySensor):
-    def __init__(self, hass, entry, fname, attr_name):
+    def __init__(self, hass, entry, fname, attr_name, device_class=None):
         super().__init__(hass, entry)
         self._attr_name = attr_name
         self._fname = fname
+        self._device_class = device_class
 
     @property
     def unique_id(self):
@@ -92,6 +94,11 @@ class ValloxDigitAttributedBinarySensor(ValloxDigitBinarySensor):
           return self._vallox2mqtt._attrs[self._attr_name] is not None
         else:
           return False
+
+    @property
+    def device_class(self):
+        """Return the device class of the binary device."""
+        return self._device_class
 
 class ValloxDigitStatusSensor(ValloxDigitBinarySensor):
     """Representation of a sensor."""
