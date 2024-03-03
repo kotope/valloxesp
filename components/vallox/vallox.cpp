@@ -51,10 +51,22 @@ const int8_t vxTemps[] = {
 #define CLIMATE_MAX_TEMPERATURE 30
 #define CLIMATE_TEMPERATURE_STEP 1
 
-        
+
 namespace esphome {
   namespace vallox {
       static const char *TAG = "vallox";
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+      void ValloxVentilationHeatBypassNum::control(float value) {
+        if (value >= 0 && value <= 20) {
+          byte hex = this->parent_->cel2Ntc(value);
+          this->parent_->setVariable(VX_VARIABLE_T_HEAT_BYPASS,hex);
+          this->publish_state(value);
+        }
+      }
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
       // set up everything on startup.. TBD
       void ValloxVentilation::setup() {
@@ -81,7 +93,7 @@ namespace esphome {
         if (now - lastRetryLoop > RETRY_INTERVAL) {
           lastRetryLoop = now;
           retryLoop();
-        }        
+        }
       }
 
 
@@ -113,9 +125,11 @@ namespace esphome {
         if (retry08)     { requestVariable(VX_VARIABLE_IO_08);  }
 
 
-        if (this->switch_active_binary_sensor_    != nullptr) { if (!this->switch_active_binary_sensor_->has_state())    { requestVariable(VX_VARIABLE_FLAGS_06); }}
+        if (this->switch_active_binary_sensor_ != nullptr) { if (!this->switch_active_binary_sensor_->has_state()) { requestVariable(VX_VARIABLE_FLAGS_06); }}
 
-        if (this->switch_type_text_sensor_ != nullptr) { if (!this->switch_type_text_sensor_->has_state())    { requestVariable(VX_VARIABLE_PROGRAM); }}
+        if (this->switch_type_text_sensor_     != nullptr) { if (!this->switch_type_text_sensor_->has_state())     { requestVariable(VX_VARIABLE_PROGRAM); }}
+
+        if (this->heat_bypass_number_          != nullptr) { if (!this->heat_bypass_number_->has_state())          { requestVariable(VX_VARIABLE_T_HEAT_BYPASS    ); }}
 
         statusMutex = false; // Clear the status mutex (prevents possible deadlocks of status)
 
@@ -263,6 +277,8 @@ namespace esphome {
         LOG_BINARY_SENSOR("  ", "Sensor problem",                this->problem_binary_sensor_);
         LOG_BINARY_SENSOR("  ", "Sensor error relay",            this->error_relay_binary_sensor_);
         LOG_BINARY_SENSOR("  ", "Sensor extra func",             this->extra_func_binary_sensor_);
+        // log number details
+        LOG_NUMBER("  ", "Number heat bypass", this->heat_bypass_number_);
       }
 
 
@@ -457,7 +473,7 @@ namespace esphome {
      void ValloxVentilation::decodeVariable08(byte variable08) {
        // For now, read only (no mutex needed)
        // flags of variable 08
-       
+
 
        if (this->summer_mode_binary_sensor_      != nullptr) { this->summer_mode_binary_sensor_->publish_state(       (variable08 & VX_08_FLAG_SUMMER_MODE)   != 0x00 ) ; }
        if (this->status_motor_in_binary_sensor_  != nullptr) { this->status_motor_in_binary_sensor_->publish_state( !((variable08 & VX_08_FLAG_MOTOR_IN)      != 0x00 )); }
@@ -505,7 +521,7 @@ namespace esphome {
        // Temperature
        if      (variable == VX_VARIABLE_T_OUTSIDE)  {
          if (this->temperature_outside_sensor_  != nullptr) { this->temperature_outside_sensor_->publish_state(ntc2Cel(value));  }
-       } 
+       }
        else if (variable == VX_VARIABLE_T_OUTGOING) {
          if (this->temperature_outgoing_sensor_ != nullptr) { this->temperature_outgoing_sensor_->publish_state(ntc2Cel(value)); }
        }
@@ -601,18 +617,16 @@ namespace esphome {
        }
        else if (variable == VX_VARIABLE_PROGRAM) {
          decodeProgram(value);
+       }
+
+       // Heat Bypass temperature
+       else if (variable == VX_VARIABLE_T_HEAT_BYPASS) {
+         if (this->heat_bypass_number_ != nullptr) { this->heat_bypass_number_->publish_state(ntc2Cel(value)); }
        } else {
          // variable not recognized
        }
 
      }
-
-
-
-
-
-
-
 
 
   }  // namespace vallox
