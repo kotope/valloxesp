@@ -8,6 +8,7 @@
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/climate/climate.h"
+#include "esphome/components/number/number.h"
 
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -60,6 +61,23 @@ const std::set< std::string > preset_custom_fan_modes = {"1", "2", "3", "4", "5"
 namespace esphome {
   namespace vallox {
 
+      class ValloxVentilation;
+      class ValloxVentilationHeatBypassNum;
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+      class ValloxVentilationHeatBypassNum : public number::Number, public Component {
+        public:
+         void set_vallox_parent(ValloxVentilation *parent) { this->parent_ = parent; }
+
+        protected:
+         void control(float value) override;
+
+         ValloxVentilation *parent_;
+      };
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
       class ValloxVentilation : public Component, public climate::Climate, public uart::UARTDevice {
         public:
 
@@ -98,11 +116,16 @@ namespace esphome {
          void set_problem_binary_sensor(binary_sensor::BinarySensor *sensor)          { this->problem_binary_sensor_          = sensor; }
          void set_error_relay_binary_sensor(binary_sensor::BinarySensor *sensor)      { this->error_relay_binary_sensor_      = sensor; }
          void set_extra_func_binary_sensor(binary_sensor::BinarySensor *sensor)       { this->extra_func_binary_sensor_       = sensor; }
+         // number controls
+         void set_heat_bypass_number(number::Number *number) { this->heat_bypass_number_ = number; }
 
+         // valloxesp functions called by other classes
+         static byte cel2Ntc(int cel);
+         void setVariable(byte variable, byte value);
 
        private:
-         // 
-         // 
+         //
+         //
          // valloxesp functions
 
 
@@ -119,13 +142,11 @@ namespace esphome {
          void requestVariable(byte variable);
          boolean setStatusVariable(byte variable, byte value);
          void setVariable(byte variable, byte value, byte target);
-         void setVariable(byte variable, byte value);         
          void decodeMessage(const byte message[]);
          void decodeStatus(byte status);
          void decodeVariable08(byte variable08);
          void decodeFlags06(byte flags06);
          void decodeProgram(byte program);
-         static byte cel2Ntc(int cel);
          static int ntc2Cel(byte ntc);
          static int hex2Rh(byte hex);
          static byte fanSpeed2Hex(int fan);
@@ -163,7 +184,7 @@ namespace esphome {
          binary_sensor::BinarySensor *problem_binary_sensor_{nullptr};
          binary_sensor::BinarySensor *error_relay_binary_sensor_{nullptr};
          binary_sensor::BinarySensor *extra_func_binary_sensor_{nullptr};
-
+         number::Number *heat_bypass_number_{nullptr};
 
 
          bool verify_fanspeed = 0;

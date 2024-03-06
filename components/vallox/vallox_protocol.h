@@ -17,6 +17,7 @@
 #define VX_VARIABLE_FLAGS_06 0x71
 #define VX_VARIABLE_HEATING_STATUS 0x07 // TODO: Not yet implemented
 #define VX_VARIABLE_PROGRAM 0xAA
+#define VX_VARIABLE_T_HEAT_BYPASS 0xAF
 
 // Order of these two seems to be that the panel first queries for LO and then HI
 // Query interval is something like 5s by the panel..

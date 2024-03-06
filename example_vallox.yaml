@@ -9,6 +9,13 @@ external_components:
     components: [ vallox ]
 
 
+##
+## if you are using esp32 set arduino framework, not needed on esp8266
+#esp32:
+#  framework:
+#    type: arduino
+
+
 uart:
   id: uart_bus
   tx_pin: TX
@@ -23,10 +30,10 @@ uart:
   #  after:
   #    bytes: 1
 
- 
+
 climate:
   - platform: vallox
-    name: ${devicename} climate
+    name: vallox climate
     uart_id: uart_bus
 
     visual:
@@ -42,76 +49,79 @@ climate:
 
     # sensor for current fan speed (is also visible as custom fan mode in climate component)
     fan_speed:
-      name: ${devicename} fan speed
+      name: vallox fan speed
     # default fan speed (minimum fan speed)
     fan_speed_default:
-      name: ${devicename} fan speed default
+      name: vallox fan speed default
     # temperature target, basically not used in my scenario other than having an indication for Home Assistant automations what temperature I would like to have (separate logic could be used with hystereses to heat/cool based on inside temperature and outside temperature)
     temperature_target:
-      name: ${devicename} temperature target
+      name: vallox temperature target
     # outside temperature
     temperature_outside:
-      name: ${devicename} temperature outside
+      name: vallox temperature outside
     # inside temperature
     temperature_inside:
-      name: ${devicename} temperature inside
+      name: vallox temperature inside
     # temperature of the exhaust (outgoing after heat exchanger (if active))
     temperature_outgoing:
-      name: ${devicename} temperature outgoing
+      name: vallox temperature outgoing
     # temperature of the incoming air (incoming after heat exchanger (if active))
     temperature_incoming:
-      name: ${devicename} temperature incoming
+      name: vallox temperature incoming
     # humidity sensor #1 (don't have one)
     humidity_1:
-      name: ${devicename} humidity 1
+      name: vallox humidity 1
     # humidity sensor #2 (don't have one)
     humidity_2:
-      name: ${devicename} humidity 2
+      name: vallox humidity 2
     # co2 sensor (don't have one)
     co2:
-      name: ${devicename} co2
-    # what type of action can be triggered using the momentary switch (fireplace/boost)  Kamin/Stoßlüftungstaster 
+      name: vallox co2
+    # what type of action can be triggered using the momentary switch (fireplace/boost)  Kamin/Stoßlüftungstaster
     switch_type:
-      name: ${devicename} switch type
+      name: vallox switch type
     # Whether the ventilation is turned on
     status_on:
-      name: ${devicename} status on
+      name: vallox status on
     # Incoming motor running
     status_motor_in:
-      name: ${devicename} status motor in
+      name: vallox status motor in
     # outgoing motor running (gets disabled for example if you use switch_type fireplace)
     status_motor_out:
-      name: ${devicename} status motor out
+      name: vallox status motor out
     # the service interval (shown in months)
     service_period:
-      name: ${devicename} service period
+      name: vallox service period
     # the remaining months in this service interval
     service_remaining:
-      name: ${devicename} service remaining
+      name: vallox service remaining
     # gets active if you are past the service interval (you can reset the interval it in the menu of the control)
     service_needed:
-      name: ${devicename} service needed
+      name: vallox service needed
     # if the switch (fireplace/boost) is currently active (boost might not make much sense if you already control the fan speed via Home Assistant, fireplace might be useful to disable the outgoing motor for 15 min)
     switch_active:
-      name: ${devicename} switch active
+      name: vallox switch active
     # Heating element (i guess, don't have one built in)
     heating:
-      name: ${devicename} heating
+      name: vallox heating
     # heating mode (enabling this also disables any bypass aka summer_mode, see my comment on top)
     heating_mode:
-      name: ${devicename} heating mode
+      name: vallox heating mode
     # Another heating element (i guess, don't have one built in)
     front_heating:
-      name: ${devicename} front heating
+      name: vallox front heating
     # whether the heat exchanger is bypassed (i.e. outside air comes in directly), aka WRG bypass
     summer_mode:
-      name: ${devicename} summer mode
+      name: vallox summer mode
     # Some problem with the device i guess?
     problem:
-      name: ${devicename} problem
+      name: vallox problem
     # Some error with some relay? no idea what that is..
     error_relay:
-      name: ${devicename} error relay
+      name: vallox error relay
     # ... No idea... maybe just don't include that :)
     extra_func:
-      name: ${devicename} extra func
+      name: vallox extra func
+    # heat bypass temperature (control)
+    heat_bypass:
+      name: vallox heat bypass

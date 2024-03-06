@@ -1,7 +1,7 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 
-from esphome.components import uart, climate, sensor, binary_sensor, text_sensor
+from esphome.components import uart, climate, sensor, binary_sensor, text_sensor, number
 
 from esphome.const import (
     CONF_ID,
@@ -19,7 +19,7 @@ from esphome.const import (
 
 
 DEPENDENCIES = ["climate","uart"]
-AUTO_LOAD = ["sensor","binary_sensor","text_sensor"]
+AUTO_LOAD = ["sensor","binary_sensor","text_sensor","number"]
 
 CONF_FAN_SPEED            = "fan_speed"
 CONF_FAN_SPEED_DEFAULT    = "fan_speed_default"
@@ -46,7 +46,7 @@ CONF_SUMMER_MODE          = "summer_mode"
 CONF_PROBLEM              = "problem"
 CONF_ERROR_RELAY          = "error_relay"
 CONF_EXTRA_FUNC           = "extra_func"
-
+CONF_HEAT_BYPASS          = "heat_bypass"
 
 UNIT_MONTH = "months"
 
@@ -58,6 +58,7 @@ ICON_HEAT_WAVE = "mdi:heat-wave"
 
 vallox_ns = cg.esphome_ns.namespace("vallox")
 ValloxVentilation = vallox_ns.class_("ValloxVentilation", climate.Climate, cg.Component)
+ValloxVentilationHeatBypassNum = vallox_ns.class_("ValloxVentilationHeatBypassNum", number.Number, cg.Component)
 
 CONFIG_SCHEMA = cv.All(
     climate.CLIMATE_SCHEMA.extend(
@@ -168,7 +169,11 @@ CONFIG_SCHEMA = cv.All(
             ),
             cv.Optional(CONF_EXTRA_FUNC): binary_sensor.binary_sensor_schema(
             ),
-            
+            cv.Optional(CONF_HEAT_BYPASS): number.NUMBER_SCHEMA.extend(
+              {
+                cv.GenerateID(): cv.declare_id(ValloxVentilationHeatBypassNum),
+              }
+            ).extend(cv.COMPONENT_SCHEMA), 
         }
     )
     .extend(uart.UART_DEVICE_SCHEMA)
@@ -256,4 +261,14 @@ async def to_code(config):
   if CONF_EXTRA_FUNC in config:
     sens = await binary_sensor.new_binary_sensor(config[CONF_EXTRA_FUNC])
     cg.add(var.set_extra_func_binary_sensor(sens))
-
+  if CONF_HEAT_BYPASS in config:
+    num_heat_bypass_var = await number.new_number(
+      config[CONF_HEAT_BYPASS],
+      min_value=0,
+      max_value=20,
+      step=1
+    )
+    await cg.register_component(num_heat_bypass_var, config[CONF_HEAT_BYPASS])
+    cg.add(var.set_heat_bypass_number(num_heat_bypass_var))
+    parent = await cg.get_variable(config[CONF_ID])
+    cg.add(num_heat_bypass_var.set_vallox_parent(parent))
