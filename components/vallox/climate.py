@@ -1,7 +1,7 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 
-from esphome.components import uart, climate, sensor, binary_sensor, text_sensor, number
+from esphome.components import uart, climate, sensor, binary_sensor, text_sensor, number, button
 
 from esphome.const import (
     CONF_ID,
@@ -11,6 +11,7 @@ from esphome.const import (
     DEVICE_CLASS_RUNNING,
     DEVICE_CLASS_PROBLEM,
     ICON_FAN,
+    ICON_RESTART,
     STATE_CLASS_MEASUREMENT,
     UNIT_CELSIUS,
     UNIT_PERCENT,
@@ -19,7 +20,7 @@ from esphome.const import (
 
 
 DEPENDENCIES = ["climate","uart"]
-AUTO_LOAD = ["sensor","binary_sensor","text_sensor","number"]
+AUTO_LOAD = ["sensor","binary_sensor","text_sensor","number","button"]
 
 CONF_FAN_SPEED            = "fan_speed"
 CONF_FAN_SPEED_DEFAULT    = "fan_speed_default"
@@ -47,6 +48,7 @@ CONF_PROBLEM              = "problem"
 CONF_ERROR_RELAY          = "error_relay"
 CONF_EXTRA_FUNC           = "extra_func"
 CONF_HEAT_BYPASS          = "heat_bypass"
+CONF_SERVICE_RESET        = "service_reset"
 
 UNIT_MONTH = "months"
 
@@ -58,7 +60,8 @@ ICON_HEAT_WAVE = "mdi:heat-wave"
 
 vallox_ns = cg.esphome_ns.namespace("vallox")
 ValloxVentilation = vallox_ns.class_("ValloxVentilation", climate.Climate, cg.Component)
-ValloxVentilationHeatBypassNum = vallox_ns.class_("ValloxVentilationHeatBypassNum", number.Number, cg.Component)
+ValloxVentilationHeatBypassNum   = vallox_ns.class_("ValloxVentilationHeatBypassNum",   number.Number, cg.Component)
+ValloxVentilationServiceResetBtn = vallox_ns.class_("ValloxVentilationServiceResetBtn", button.Button, cg.Component)
 
 CONFIG_SCHEMA = cv.All(
     climate.CLIMATE_SCHEMA.extend(
@@ -169,11 +172,14 @@ CONFIG_SCHEMA = cv.All(
             ),
             cv.Optional(CONF_EXTRA_FUNC): binary_sensor.binary_sensor_schema(
             ),
-            cv.Optional(CONF_HEAT_BYPASS): number.NUMBER_SCHEMA.extend(
-              {
-                cv.GenerateID(): cv.declare_id(ValloxVentilationHeatBypassNum),
-              }
-            ).extend(cv.COMPONENT_SCHEMA), 
+            cv.Optional(CONF_HEAT_BYPASS): number.number_schema(
+              ValloxVentilationHeatBypassNum,
+              device_class=DEVICE_CLASS_TEMPERATURE,
+            ),
+            cv.Optional(CONF_SERVICE_RESET): button.button_schema(
+              ValloxVentilationServiceResetBtn,
+              icon=ICON_RESTART,
+            ), 
         }
     )
     .extend(uart.UART_DEVICE_SCHEMA)
@@ -272,3 +278,9 @@ async def to_code(config):
     cg.add(var.set_heat_bypass_number(num_heat_bypass_var))
     parent = await cg.get_variable(config[CONF_ID])
     cg.add(num_heat_bypass_var.set_vallox_parent(parent))
+  if CONF_SERVICE_RESET in config:
+    btn_service_reset_var = await button.new_button(config[CONF_SERVICE_RESET])
+    await cg.register_component(btn_service_reset_var, config[CONF_SERVICE_RESET])
+    cg.add(var.set_service_reset_button(btn_service_reset_var))
+    parent = await cg.get_variable(config[CONF_ID])
+    cg.add(btn_service_reset_var.set_vallox_parent(parent))

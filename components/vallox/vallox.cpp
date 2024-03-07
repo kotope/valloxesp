@@ -68,6 +68,16 @@ namespace esphome {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+      void ValloxVentilationServiceResetBtn::press_action() {
+        // ensure service_period variable is filled
+        this->parent_->requestVariable(VX_VARIABLE_SERVICE_PERIOD);
+        // use service_period to set...        
+        this->parent_->setVariable(VX_VARIABLE_SERVICE_REMAINING,this->parent_->service_period);
+        this->parent_->requestVariable(VX_VARIABLE_SERVICE_REMAINING);
+      }
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
       // set up everything on startup.. TBD
       void ValloxVentilation::setup() {
         requestVariable(VX_VARIABLE_STATUS);
@@ -600,6 +610,7 @@ namespace esphome {
          decodeFlags06(value);
        }
        else if (variable == VX_VARIABLE_SERVICE_PERIOD) {
+         service_period = value;  // used to reset counter to specified interval
          val = (float)value;
          if (this->service_period_sensor_ != nullptr) { this->service_period_sensor_->publish_state(val); }
        }

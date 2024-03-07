@@ -9,6 +9,7 @@
 #include "esphome/components/text_sensor/text_sensor.h"
 #include "esphome/components/climate/climate.h"
 #include "esphome/components/number/number.h"
+#include "esphome/components/button/button.h"
 
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -63,6 +64,7 @@ namespace esphome {
 
       class ValloxVentilation;
       class ValloxVentilationHeatBypassNum;
+      class ValloxVentilationServiceResetBtn;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -72,6 +74,18 @@ namespace esphome {
 
         protected:
          void control(float value) override;
+
+         ValloxVentilation *parent_;
+      };
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+      class ValloxVentilationServiceResetBtn : public button::Button, public Component {
+        public:
+         void set_vallox_parent(ValloxVentilation *parent) { this->parent_ = parent; }
+
+        protected:
+         void press_action() override;
 
          ValloxVentilation *parent_;
       };
@@ -118,10 +132,14 @@ namespace esphome {
          void set_extra_func_binary_sensor(binary_sensor::BinarySensor *sensor)       { this->extra_func_binary_sensor_       = sensor; }
          // number controls
          void set_heat_bypass_number(number::Number *number) { this->heat_bypass_number_ = number; }
+         // button controls
+         void set_service_reset_button(button::Button *button) { this->service_reset_button_ = button; }
 
          // valloxesp functions called by other classes
          static byte cel2Ntc(int cel);
          void setVariable(byte variable, byte value);
+         void requestVariable(byte variable);
+         int service_period = 1; // set to 1 month to make any issue more obvious
 
        private:
          //
@@ -139,7 +157,6 @@ namespace esphome {
          boolean readMessage(byte message[]);
          void verifyLoop();
          void retryLoop();
-         void requestVariable(byte variable);
          boolean setStatusVariable(byte variable, byte value);
          void setVariable(byte variable, byte value, byte target);
          void decodeMessage(const byte message[]);
@@ -185,7 +202,7 @@ namespace esphome {
          binary_sensor::BinarySensor *error_relay_binary_sensor_{nullptr};
          binary_sensor::BinarySensor *extra_func_binary_sensor_{nullptr};
          number::Number *heat_bypass_number_{nullptr};
-
+         button::Button *service_reset_button_{nullptr};
 
          bool verify_fanspeed = 0;
          byte buffer_fanspeed = 0x00;
