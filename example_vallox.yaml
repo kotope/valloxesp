@@ -122,6 +122,9 @@ climate:
     # ... No idea... maybe just don't include that :)
     extra_func:
       name: vallox extra func
-    # heat bypass temperature (control)
+    # heat bypass temperature (control / number)
     heat_bypass:
       name: vallox heat bypass
+    # reset service_remaining months to service_period value (control / button)
+    service_reset:
+      name: vallox service reset
