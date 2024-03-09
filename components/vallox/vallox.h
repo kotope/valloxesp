@@ -10,14 +10,11 @@
 #include "esphome/components/climate/climate.h"
 #include "esphome/components/number/number.h"
 #include "esphome/components/button/button.h"
+#include "esphome/components/select/select.h"
 
 
 /////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////
-
-
-
-
 
 
 #define VX_MSG_LENGTH 6
@@ -38,25 +35,13 @@
 
 #define CO2_LIFE_TIME_MS 2000 // Maximum time that LO and HI bytes are considered to be the same value
 
-#define DEBUG_PRINT_CALLBACK_SIGNATURE std::function<void(String debugPrint)> debugPrintCallback
-#define PACKET_CALLBACK_SIGNATURE std::function<void(byte* packet, unsigned int length, char* packetDirection)> packetCallback
-#define STATUS_CHANGED_CALLBACK_SIGNATURE std::function<void()> statusChangedCallback
-#define TEMPERATURE_CHANGED_CALLBACK_SIGNATURE std::function<void()> temperatureChangedCallback
-
 
 // default names of fan modes (1-8)
 const std::set< std::string > preset_custom_fan_modes = {"1", "2", "3", "4", "5", "6", "7", "8"};
 
 
-
 /////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////
-
-
-
-
-
-
 
 
 namespace esphome {
@@ -65,6 +50,7 @@ namespace esphome {
       class ValloxVentilation;
       class ValloxVentilationHeatBypassNum;
       class ValloxVentilationServiceResetBtn;
+      class ValloxVentilationSwitchSelectSel;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -86,6 +72,18 @@ namespace esphome {
 
         protected:
          void press_action() override;
+
+         ValloxVentilation *parent_;
+      };
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+      class ValloxVentilationSwitchTypeSelectSel : public select::Select, public Component {
+        public:
+         void set_vallox_parent(ValloxVentilation *parent) { this->parent_ = parent; }
+
+        protected:
+         void control(const std::string &value) override;
 
          ValloxVentilation *parent_;
       };
@@ -117,6 +115,7 @@ namespace esphome {
          void set_service_remaining_sensor(sensor::Sensor *sensor)    { this->service_remaining_sensor_    = sensor; }
          // text sensors
          void set_switch_type_text_sensor(text_sensor::TextSensor *sensor) { this->switch_type_text_sensor_ = sensor; }
+         void set_fault_condition_text_sensor(text_sensor::TextSensor *sensor) { this->fault_condition_text_sensor_ = sensor; }
          // binary sensors
          void set_status_on_binary_sensor(binary_sensor::BinarySensor *sensor)        { this->status_on_binary_sensor_        = sensor; }
          void set_status_motor_in_binary_sensor(binary_sensor::BinarySensor *sensor)  { this->status_motor_in_binary_sensor_  = sensor; }
@@ -134,30 +133,27 @@ namespace esphome {
          void set_heat_bypass_number(number::Number *number) { this->heat_bypass_number_ = number; }
          // button controls
          void set_service_reset_button(button::Button *button) { this->service_reset_button_ = button; }
+         // select controls
+         void set_switch_type_select_select(select::Select *select) { this->switch_type_select_select_ = select; }
+
 
          // valloxesp functions called by other classes
          static byte cel2Ntc(int cel);
          void setVariable(byte variable, byte value);
+         void setProgramVariable(byte bitpos, bool value);
          void requestVariable(byte variable);
          int service_period = 1; // set to 1 month to make any issue more obvious
 
        private:
-         //
-         //
-         // valloxesp functions
-
-
-
          // lock status (prevent sending and overriding different values until we have received the last)
          boolean statusMutex = false;
-         unsigned long lastVerifyLoop = 0;
+         boolean programMutex = false;
          unsigned long lastRetryLoop = 0;
          unsigned long lastRequested = 0;
 
          boolean readMessage(byte message[]);
-         void verifyLoop();
          void retryLoop();
-         boolean setStatusVariable(byte variable, byte value);
+         void setStatusVariable(byte variable, byte value);
          void setVariable(byte variable, byte value, byte target);
          void decodeMessage(const byte message[]);
          void decodeStatus(byte status);
@@ -189,6 +185,7 @@ namespace esphome {
          sensor::Sensor *service_period_sensor_{nullptr};
          sensor::Sensor *service_remaining_sensor_{nullptr};
          text_sensor::TextSensor *switch_type_text_sensor_{nullptr};
+         text_sensor::TextSensor *fault_condition_text_sensor_{nullptr};
          binary_sensor::BinarySensor *status_on_binary_sensor_{nullptr};
          binary_sensor::BinarySensor *status_motor_in_binary_sensor_{nullptr};
          binary_sensor::BinarySensor *status_motor_out_binary_sensor_{nullptr};
@@ -203,15 +200,13 @@ namespace esphome {
          binary_sensor::BinarySensor *extra_func_binary_sensor_{nullptr};
          number::Number *heat_bypass_number_{nullptr};
          button::Button *service_reset_button_{nullptr};
+         select::Select *switch_type_select_select_{nullptr};
 
-         bool verify_fanspeed = 0;
-         byte buffer_fanspeed = 0x00;
-         byte target_fanspeed = 0x00;
-         bool verify_status = 0;
          byte buffer_status = 0x00;
          byte target_status = 0x00;
-         bool verify_06 = 1;
          byte buffer_06 = 0x00;
+         byte buffer_program = 0x00;
+
          byte buffer_co2_hi = 0x00;
          byte buffer_co2_lo = 0x00;
          unsigned long buffer_co2_hi_ts = 0;

@@ -1,17 +1,17 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 
-from esphome.components import uart, climate, sensor, binary_sensor, text_sensor, number, button
+from esphome.components import uart, climate, sensor, binary_sensor, text_sensor, number, button, select
 
 from esphome.const import (
     CONF_ID,
+    ENTITY_CATEGORY_CONFIG,
     DEVICE_CLASS_TEMPERATURE,
     DEVICE_CLASS_HUMIDITY,
     DEVICE_CLASS_CARBON_DIOXIDE,
     DEVICE_CLASS_RUNNING,
     DEVICE_CLASS_PROBLEM,
     ICON_FAN,
-    ICON_RESTART,
     STATE_CLASS_MEASUREMENT,
     UNIT_CELSIUS,
     UNIT_PERCENT,
@@ -20,7 +20,7 @@ from esphome.const import (
 
 
 DEPENDENCIES = ["climate","uart"]
-AUTO_LOAD = ["sensor","binary_sensor","text_sensor","number","button"]
+AUTO_LOAD = ["sensor","binary_sensor","text_sensor","number","button","select"]
 
 CONF_FAN_SPEED            = "fan_speed"
 CONF_FAN_SPEED_DEFAULT    = "fan_speed_default"
@@ -49,6 +49,12 @@ CONF_ERROR_RELAY          = "error_relay"
 CONF_EXTRA_FUNC           = "extra_func"
 CONF_HEAT_BYPASS          = "heat_bypass"
 CONF_SERVICE_RESET        = "service_reset"
+CONF_FAULT_CONDITION      = "fault_condition"
+CONF_SWITCH_TYPE_SELECT   = "switch_type_select"
+
+# options for the switch type selector (also in vallox.cpp)
+SELECT_SWITCH_TYPE_BOOST     = "boost"
+SELECT_SWITCH_TYPE_FIREPLACE = "fireplace"
 
 UNIT_MONTH = "months"
 
@@ -56,12 +62,13 @@ UNIT_MONTH = "months"
 ICON_CALENDAR = "mdi:calendar-month"
 ICON_CALENDAR_ALERT = "mdi:calendar-alert"
 ICON_HEAT_WAVE = "mdi:heat-wave"
-
+ICON_CALENDAR_REFRESH = "mdi:calendar-refresh"
 
 vallox_ns = cg.esphome_ns.namespace("vallox")
 ValloxVentilation = vallox_ns.class_("ValloxVentilation", climate.Climate, cg.Component)
-ValloxVentilationHeatBypassNum   = vallox_ns.class_("ValloxVentilationHeatBypassNum",   number.Number, cg.Component)
-ValloxVentilationServiceResetBtn = vallox_ns.class_("ValloxVentilationServiceResetBtn", button.Button, cg.Component)
+ValloxVentilationHeatBypassNum       = vallox_ns.class_("ValloxVentilationHeatBypassNum",       number.Number, cg.Component)
+ValloxVentilationServiceResetBtn     = vallox_ns.class_("ValloxVentilationServiceResetBtn",     button.Button, cg.Component)
+ValloxVentilationSwitchTypeSelectSel = vallox_ns.class_("ValloxVentilationSwitchTypeSelectSel", select.Select, cg.Component)
 
 CONFIG_SCHEMA = cv.All(
     climate.CLIMATE_SCHEMA.extend(
@@ -139,6 +146,8 @@ CONFIG_SCHEMA = cv.All(
             ),
             cv.Optional(CONF_SWITCH_TYPE): text_sensor.text_sensor_schema(
             ),
+            cv.Optional(CONF_FAULT_CONDITION): text_sensor.text_sensor_schema(
+            ),
             cv.Optional(CONF_STATUS_ON): binary_sensor.binary_sensor_schema(
                 device_class=DEVICE_CLASS_RUNNING,
             ),
@@ -178,8 +187,13 @@ CONFIG_SCHEMA = cv.All(
             ),
             cv.Optional(CONF_SERVICE_RESET): button.button_schema(
               ValloxVentilationServiceResetBtn,
-              icon=ICON_RESTART,
+              entity_category=ENTITY_CATEGORY_CONFIG,
+              icon=ICON_CALENDAR_REFRESH,
             ), 
+            cv.Optional(CONF_SWITCH_TYPE_SELECT): select.select_schema(
+              ValloxVentilationSwitchTypeSelectSel,
+              entity_category=ENTITY_CATEGORY_CONFIG,
+            ),
         }
     )
     .extend(uart.UART_DEVICE_SCHEMA)
@@ -231,6 +245,9 @@ async def to_code(config):
   if CONF_SWITCH_TYPE in config:
     sens = await text_sensor.new_text_sensor(config[CONF_SWITCH_TYPE])
     cg.add(var.set_switch_type_text_sensor(sens))
+  if CONF_FAULT_CONDITION in config:
+    sens = await text_sensor.new_text_sensor(config[CONF_FAULT_CONDITION])
+    cg.add(var.set_fault_condition_text_sensor(sens))
   if CONF_STATUS_ON in config:
     sens = await binary_sensor.new_binary_sensor(config[CONF_STATUS_ON])
     cg.add(var.set_status_on_binary_sensor(sens))
@@ -284,3 +301,15 @@ async def to_code(config):
     cg.add(var.set_service_reset_button(btn_service_reset_var))
     parent = await cg.get_variable(config[CONF_ID])
     cg.add(btn_service_reset_var.set_vallox_parent(parent))
+  if CONF_SWITCH_TYPE_SELECT in config:
+    sel_switch_type_select_var = await select.new_select(
+      config[CONF_SWITCH_TYPE_SELECT],
+      options=[
+        SELECT_SWITCH_TYPE_BOOST,
+        SELECT_SWITCH_TYPE_FIREPLACE,
+      ],
+    )
+    await cg.register_component(sel_switch_type_select_var, config[CONF_SWITCH_TYPE_SELECT])
+    cg.add(var.set_switch_type_select_select(sel_switch_type_select_var))
+    parent = await cg.get_variable(config[CONF_ID])
+    cg.add(sel_switch_type_select_var.set_vallox_parent(parent))

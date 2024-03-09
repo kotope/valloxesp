@@ -51,6 +51,9 @@ const int8_t vxTemps[] = {
 #define CLIMATE_MAX_TEMPERATURE 30
 #define CLIMATE_TEMPERATURE_STEP 1
 
+#define SWITCH_TYPE_ACTION_FIREPLACE "fireplace"
+#define SWITCH_TYPE_ACTION_BOOST     "boost"
+
 
 namespace esphome {
   namespace vallox {
@@ -74,6 +77,17 @@ namespace esphome {
         // use service_period to set...        
         this->parent_->setVariable(VX_VARIABLE_SERVICE_REMAINING,this->parent_->service_period);
         this->parent_->requestVariable(VX_VARIABLE_SERVICE_REMAINING);
+      }
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+      void ValloxVentilationSwitchTypeSelectSel::control(const std::string &value) {
+        if (value == SWITCH_TYPE_ACTION_BOOST) {
+          this->parent_->setProgramVariable(VX_PROGRAM_SWITCH_TYPE, 1); // set bit 5 to 1
+        }
+        if (value == SWITCH_TYPE_ACTION_FIREPLACE) {
+          this->parent_->setProgramVariable(VX_PROGRAM_SWITCH_TYPE, 0); // set bit 5 to 0
+        }
       }
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -108,9 +122,9 @@ namespace esphome {
 
 
       void ValloxVentilation::retryLoop() {
-        bool retryStatus = 0;
-        bool retry08 = 0;
-
+        bool retryStatus  = 0;
+        bool retry08      = 0;
+        bool retryProgram = 0;
 
         if (this->fan_speed_sensor_            != nullptr) { if (!this->fan_speed_sensor_->has_state())          { requestVariable(VX_VARIABLE_FAN_SPEED        ); }}
         if (this->fan_speed_default_sensor_    != nullptr) { if (!this->fan_speed_default_sensor_->has_state())  { requestVariable(VX_VARIABLE_DEFAULT_FAN_SPEED); }}
@@ -135,20 +149,40 @@ namespace esphome {
         if (retry08)     { requestVariable(VX_VARIABLE_IO_08);  }
 
 
+        if (this->switch_type_text_sensor_     != nullptr) { if (!this->switch_type_text_sensor_->has_state())     { retryProgram = 1; }}
+        if (this->switch_type_select_select_   != nullptr) { if (!this->switch_type_select_select_->has_state())   { retryProgram = 1; }}
+        if (retryProgram) { requestVariable(VX_VARIABLE_PROGRAM); }
+
+        
         if (this->switch_active_binary_sensor_ != nullptr) { if (!this->switch_active_binary_sensor_->has_state()) { requestVariable(VX_VARIABLE_FLAGS_06); }}
 
-        if (this->switch_type_text_sensor_     != nullptr) { if (!this->switch_type_text_sensor_->has_state())     { requestVariable(VX_VARIABLE_PROGRAM); }}
+        if (this->fault_condition_text_sensor_ != nullptr) { if (!this->fault_condition_text_sensor_->has_state()) { requestVariable(VX_VARIABLE_FAULT_CODE); }}
 
-        if (this->heat_bypass_number_          != nullptr) { if (!this->heat_bypass_number_->has_state())          { requestVariable(VX_VARIABLE_T_HEAT_BYPASS    ); }}
+        if (this->heat_bypass_number_          != nullptr) { if (!this->heat_bypass_number_->has_state())          { requestVariable(VX_VARIABLE_T_HEAT_BYPASS); }}
+
 
         statusMutex = false; // Clear the status mutex (prevents possible deadlocks of status)
-
+        programMutex = false;
       }
 
 
 
+      void ValloxVentilation::setProgramVariable(byte bitpos, bool value) {
+        // ensure buffer_program variable is filled
+        requestVariable(VX_VARIABLE_PROGRAM);
+        if (!programMutex) {
+          programMutex = true;
+          if (value) {
+            setVariable(VX_VARIABLE_PROGRAM, buffer_program | bitpos); // set bit to 1
+          } else {
+            setVariable(VX_VARIABLE_PROGRAM, buffer_program & (~bitpos)); // set bit to 0
+          }
+          lastRetryLoop = millis();
+          requestVariable(VX_VARIABLE_PROGRAM);
+        }
+      } 
 
-      boolean ValloxVentilation::setStatusVariable(byte variable, byte value) {
+      void ValloxVentilation::setStatusVariable(byte variable, byte value) {
         if (!statusMutex) {
           statusMutex = true; // lock sending status again
           // Status is only allowed to send to specific mainboard
@@ -156,9 +190,7 @@ namespace esphome {
 
           // Clear the retry loop to prevent retry loops to break in before getting reply
           lastRetryLoop = millis();
-          return true;
         }
-        return false;
       }
 
 
@@ -260,35 +292,45 @@ namespace esphome {
         climate::Climate::dump_traits_(TAG);
 
         // log sensor details
-        LOG_SENSOR("  ", "Sensor fan speed", this->fan_speed_sensor_);
-        LOG_SENSOR("  ", "Sensor fan speed (default)",     this->fan_speed_default_sensor_);
-        LOG_SENSOR("  ", "Sensor temperature target",      this->temperature_target_sensor_);
-        LOG_SENSOR("  ", "Sensor temperature (outside)",   this->temperature_outside_sensor_);
-        LOG_SENSOR("  ", "Sensor temperature (inside)",    this->temperature_inside_sensor_);
-        LOG_SENSOR("  ", "Sensor temperature (outgoing)",  this->temperature_outgoing_sensor_);
-        LOG_SENSOR("  ", "Sensor temperature (incoming)",  this->temperature_incoming_sensor_);
-        LOG_SENSOR("  ", "Sensor humidity sensor 1",       this->humidity_1_sensor_);
-        LOG_SENSOR("  ", "Sensor humidity sensor 2",       this->humidity_2_sensor_);
-        LOG_SENSOR("  ", "Sensor CO2 sensor",              this->co2_sensor_);
-        LOG_SENSOR("  ", "Sensor service period",          this->service_period_sensor_);
-        LOG_SENSOR("  ", "Sensor service remaining",       this->service_remaining_sensor_);
+        if (this->fan_speed_sensor_            != nullptr) { LOG_SENSOR("  ", "Sensor fan speed", this->fan_speed_sensor_);                          }
+        if (this->fan_speed_default_sensor_    != nullptr) { LOG_SENSOR("  ", "Sensor fan speed (default)",     this->fan_speed_default_sensor_);    }
+        if (this->temperature_target_sensor_   != nullptr) { LOG_SENSOR("  ", "Sensor temperature target",      this->temperature_target_sensor_);   }
+        if (this->temperature_outside_sensor_  != nullptr) { LOG_SENSOR("  ", "Sensor temperature (outside)",   this->temperature_outside_sensor_);  }
+        if (this->temperature_inside_sensor_   != nullptr) { LOG_SENSOR("  ", "Sensor temperature (inside)",    this->temperature_inside_sensor_);   }
+        if (this->temperature_outgoing_sensor_ != nullptr) { LOG_SENSOR("  ", "Sensor temperature (outgoing)",  this->temperature_outgoing_sensor_); }
+        if (this->temperature_incoming_sensor_ != nullptr) { LOG_SENSOR("  ", "Sensor temperature (incoming)",  this->temperature_incoming_sensor_); }
+        if (this->humidity_1_sensor_           != nullptr) { LOG_SENSOR("  ", "Sensor humidity sensor 1",       this->humidity_1_sensor_);           }
+        if (this->humidity_2_sensor_           != nullptr) { LOG_SENSOR("  ", "Sensor humidity sensor 2",       this->humidity_2_sensor_);           }
+        if (this->co2_sensor_                  != nullptr) { LOG_SENSOR("  ", "Sensor CO2 sensor",              this->co2_sensor_);                  }
+        if (this->service_period_sensor_       != nullptr) { LOG_SENSOR("  ", "Sensor service period",          this->service_period_sensor_);       }
+        if (this->service_remaining_sensor_    != nullptr) { LOG_SENSOR("  ", "Sensor service remaining",       this->service_remaining_sensor_);    }
+
         // log text sensor details
-        LOG_TEXT_SENSOR("  ", "Sensor switch type", this->switch_type_text_sensor_);
+        if (this->switch_type_text_sensor_     != nullptr) { LOG_TEXT_SENSOR("  ", "Sensor switch type", this->switch_type_text_sensor_);         }
+        if (this->fault_condition_text_sensor_ != nullptr) { LOG_TEXT_SENSOR("  ", "Sensor fault condition", this->fault_condition_text_sensor_); }
+
         // log binary sensor details
-        LOG_BINARY_SENSOR("  ", "Sensor status (active)",        this->status_on_binary_sensor_);
-        LOG_BINARY_SENSOR("  ", "Sensor status motor incoming",  this->status_motor_in_binary_sensor_);
-        LOG_BINARY_SENSOR("  ", "Sensor status motor outgoing",  this->status_motor_out_binary_sensor_);
-        LOG_BINARY_SENSOR("  ", "Sensor service required",       this->service_needed_binary_sensor_);
-        LOG_BINARY_SENSOR("  ", "Sensor switch active",          this->switch_active_binary_sensor_);
-        LOG_BINARY_SENSOR("  ", "Sensor heating (active)",       this->heating_binary_sensor_);
-        LOG_BINARY_SENSOR("  ", "Sensor front heating (active)", this->front_heating_binary_sensor_);
-        LOG_BINARY_SENSOR("  ", "Sensor heating mode (active)",  this->heating_mode_binary_sensor_);
-        LOG_BINARY_SENSOR("  ", "Sensor summer mode",            this->summer_mode_binary_sensor_);
-        LOG_BINARY_SENSOR("  ", "Sensor problem",                this->problem_binary_sensor_);
-        LOG_BINARY_SENSOR("  ", "Sensor error relay",            this->error_relay_binary_sensor_);
-        LOG_BINARY_SENSOR("  ", "Sensor extra func",             this->extra_func_binary_sensor_);
+        if (this->status_on_binary_sensor_        != nullptr) { LOG_BINARY_SENSOR("  ", "Sensor status (active)",        this->status_on_binary_sensor_);        }
+        if (this->status_motor_in_binary_sensor_  != nullptr) { LOG_BINARY_SENSOR("  ", "Sensor status motor incoming",  this->status_motor_in_binary_sensor_);  }
+        if (this->status_motor_out_binary_sensor_ != nullptr) { LOG_BINARY_SENSOR("  ", "Sensor status motor outgoing",  this->status_motor_out_binary_sensor_); }
+        if (this->service_needed_binary_sensor_   != nullptr) { LOG_BINARY_SENSOR("  ", "Sensor service required",       this->service_needed_binary_sensor_);   }
+        if (this->switch_active_binary_sensor_    != nullptr) { LOG_BINARY_SENSOR("  ", "Sensor switch active",          this->switch_active_binary_sensor_);    }
+        if (this->heating_binary_sensor_          != nullptr) { LOG_BINARY_SENSOR("  ", "Sensor heating (active)",       this->heating_binary_sensor_);          }
+        if (this->front_heating_binary_sensor_    != nullptr) { LOG_BINARY_SENSOR("  ", "Sensor front heating (active)", this->front_heating_binary_sensor_);    }
+        if (this->heating_mode_binary_sensor_     != nullptr) { LOG_BINARY_SENSOR("  ", "Sensor heating mode (active)",  this->heating_mode_binary_sensor_);     }
+        if (this->summer_mode_binary_sensor_      != nullptr) { LOG_BINARY_SENSOR("  ", "Sensor summer mode",            this->summer_mode_binary_sensor_);      }
+        if (this->problem_binary_sensor_          != nullptr) { LOG_BINARY_SENSOR("  ", "Sensor problem",                this->problem_binary_sensor_);          }
+        if (this->error_relay_binary_sensor_      != nullptr) { LOG_BINARY_SENSOR("  ", "Sensor error relay",            this->error_relay_binary_sensor_);      }
+        if (this->extra_func_binary_sensor_       != nullptr) { LOG_BINARY_SENSOR("  ", "Sensor extra func",             this->extra_func_binary_sensor_);       }
+
         // log number details
-        LOG_NUMBER("  ", "Number heat bypass", this->heat_bypass_number_);
+        if (this->heat_bypass_number_ != nullptr) { LOG_NUMBER("  ", "Number heat bypass", this->heat_bypass_number_); }
+
+        // log button details
+        if (this->service_reset_button_ != nullptr) { LOG_BUTTON("  ", "Button service reset", this->service_reset_button_); }
+
+        // log select details
+        if (this->switch_type_select_select_ != nullptr) { LOG_SELECT("  ", "Select switch type", this->switch_type_select_select_); }
       }
 
 
@@ -467,16 +509,19 @@ namespace esphome {
      void ValloxVentilation::decodeProgram(byte program) {
        // flags of programs variable
 
+       buffer_program = program;
+
        if (this->switch_type_text_sensor_ != nullptr) {
-         this->switch_type_text_sensor_->publish_state( ((program & VX_PROGRAM_SWITCH_TYPE) != 0x00) ? "boost" : "fireplace" );
+         this->switch_type_text_sensor_->publish_state( ((program & VX_PROGRAM_SWITCH_TYPE) != 0x00) ? SWITCH_TYPE_ACTION_BOOST : SWITCH_TYPE_ACTION_FIREPLACE );
        }
+       if (this->switch_type_select_select_ != nullptr) {
+         this->switch_type_select_select_->publish_state( ((program & VX_PROGRAM_SWITCH_TYPE) != 0x00) ? SWITCH_TYPE_ACTION_BOOST : SWITCH_TYPE_ACTION_FIREPLACE );
+       }
+       programMutex = false;
      }
 
      void ValloxVentilation::decodeFlags06(byte flags06) {
-       // For now, read only (no mutex needed)
-       // flags of variable 06
-       buffer_06 = flags06;
-
+       // flags of variable 06 (0x71)
        if (this->switch_active_binary_sensor_ != nullptr) { this->switch_active_binary_sensor_->publish_state( (flags06 & VX_06_FIREPLACE_FLAG_IS_ACTIVE) != 0x00 ) ; }
      }
 
@@ -607,6 +652,7 @@ namespace esphome {
          decodeVariable08(value);
        }
        else if (variable == VX_VARIABLE_FLAGS_06) {
+         buffer_06 = value;
          decodeFlags06(value);
        }
        else if (variable == VX_VARIABLE_SERVICE_PERIOD) {
@@ -627,12 +673,24 @@ namespace esphome {
          }
        }
        else if (variable == VX_VARIABLE_PROGRAM) {
+         buffer_program = value;
          decodeProgram(value);
        }
 
        // Heat Bypass temperature
        else if (variable == VX_VARIABLE_T_HEAT_BYPASS) {
          if (this->heat_bypass_number_ != nullptr) { this->heat_bypass_number_->publish_state(ntc2Cel(value)); }
+       }
+       else if (variable == VX_VARIABLE_FAULT_CODE) {
+         if (this->fault_condition_text_sensor_ != nullptr) {
+           if (value == 0x05) { this->fault_condition_text_sensor_->publish_state("incoming air sensor fault");         }
+           if (value == 0x06) { this->fault_condition_text_sensor_->publish_state("carbon dioxide alarm");              }
+           if (value == 0x07) { this->fault_condition_text_sensor_->publish_state("outside sensor fault");              }
+           if (value == 0x08) { this->fault_condition_text_sensor_->publish_state("inside air sensor fault");           }
+           if (value == 0x09) { this->fault_condition_text_sensor_->publish_state("danger of the water coil freezing"); }
+           if (value == 0x0a) { this->fault_condition_text_sensor_->publish_state("outgoing air sensor fault");         }
+         }
+
        } else {
          // variable not recognized
        }
