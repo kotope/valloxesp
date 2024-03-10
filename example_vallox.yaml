@@ -128,3 +128,9 @@ climate:
     # reset service_remaining months to service_period value (control / button)
     service_reset:
       name: vallox service reset
+    # description of fault (if any)
+    fault_condition:
+      name: vallox fault condition
+    # select switch type (boost/fireplace), same as switch_type but selectable (switch_type is only a sensor) (control / select)
+    switch_type_select:
+      name: vallox switch type select
