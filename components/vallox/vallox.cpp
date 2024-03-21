@@ -92,6 +92,26 @@ namespace esphome {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+      void ValloxVentilationFanSpeedMaxNum::control(float value) {
+        if (value >= 1 && value <= 8) {
+          byte hex = ~(((byte)0xFF) << (int)value);  // example for speed 2 : 11111111 => 11111100 => 00000011 => 0x03
+          this->parent_->setVariable(VX_VARIABLE_FAN_SPEED_MAX,hex);
+          this->publish_state(value);
+        }
+      }
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+      void ValloxVentilationFanSpeedMinNum::control(float value) {
+        if (value >= 1 && value <= 8) {
+          byte hex = ~(((byte)0xFF) << (int)value);
+          this->parent_->setVariable(VX_VARIABLE_FAN_SPEED_MIN,hex);
+          this->publish_state(value);
+        }
+      }
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
       // set up everything on startup.. TBD
       void ValloxVentilation::setup() {
         requestVariable(VX_VARIABLE_STATUS);
@@ -127,7 +147,7 @@ namespace esphome {
         bool retryProgram = 0;
 
         if (this->fan_speed_sensor_            != nullptr) { if (!this->fan_speed_sensor_->has_state())          { requestVariable(VX_VARIABLE_FAN_SPEED        ); }}
-        if (this->fan_speed_default_sensor_    != nullptr) { if (!this->fan_speed_default_sensor_->has_state())  { requestVariable(VX_VARIABLE_DEFAULT_FAN_SPEED); }}
+        if (this->fan_speed_default_sensor_    != nullptr) { if (!this->fan_speed_default_sensor_->has_state())  { requestVariable(VX_VARIABLE_FAN_SPEED_MIN    ); }}
         if (this->service_period_sensor_       != nullptr) { if (!this->service_period_sensor_->has_state())     { requestVariable(VX_VARIABLE_SERVICE_PERIOD   ); }}
         if (this->service_remaining_sensor_    != nullptr) { if (!this->service_remaining_sensor_->has_state())  { requestVariable(VX_VARIABLE_SERVICE_REMAINING); }}
         if (this->temperature_target_sensor_   != nullptr) { if (!this->temperature_target_sensor_->has_state()) { requestVariable(VX_VARIABLE_HEATING_TARGET   ); }}
@@ -159,6 +179,8 @@ namespace esphome {
         if (this->fault_condition_text_sensor_ != nullptr) { if (!this->fault_condition_text_sensor_->has_state()) { requestVariable(VX_VARIABLE_FAULT_CODE); }}
 
         if (this->heat_bypass_number_          != nullptr) { if (!this->heat_bypass_number_->has_state())          { requestVariable(VX_VARIABLE_T_HEAT_BYPASS); }}
+        if (this->fan_speed_max_number_        != nullptr) { if (!this->fan_speed_max_number_->has_state())        { requestVariable(VX_VARIABLE_FAN_SPEED_MAX); }}
+        if (this->fan_speed_min_number_        != nullptr) { if (!this->fan_speed_min_number_->has_state())        { requestVariable(VX_VARIABLE_FAN_SPEED_MIN); }}
 
 
         statusMutex = false; // Clear the status mutex (prevents possible deadlocks of status)
@@ -324,7 +346,9 @@ namespace esphome {
         if (this->extra_func_binary_sensor_       != nullptr) { LOG_BINARY_SENSOR("  ", "Sensor extra func",             this->extra_func_binary_sensor_);       }
 
         // log number details
-        if (this->heat_bypass_number_ != nullptr) { LOG_NUMBER("  ", "Number heat bypass", this->heat_bypass_number_); }
+        if (this->heat_bypass_number_   != nullptr) { LOG_NUMBER("  ", "Number heat bypass",   this->heat_bypass_number_);   }
+        if (this->fan_speed_max_number_ != nullptr) { LOG_NUMBER("  ", "Number fan speed max", this->fan_speed_max_number_); }
+        if (this->fan_speed_min_number_ != nullptr) { LOG_NUMBER("  ", "Number fan speed min", this->fan_speed_min_number_); }
 
         // log button details
         if (this->service_reset_button_ != nullptr) { LOG_BUTTON("  ", "Button service reset", this->service_reset_button_); }
@@ -638,10 +662,11 @@ namespace esphome {
            this->publish_state();
          }
        }
-       else if (variable == VX_VARIABLE_DEFAULT_FAN_SPEED) {
+       else if (variable == VX_VARIABLE_FAN_SPEED_MIN) {
          val = hex2FanSpeed(value);
          if (val!=NOT_SET) {
            if (this->fan_speed_default_sensor_ != nullptr) { this->fan_speed_default_sensor_->publish_state(val); }
+           if (this->fan_speed_min_number_ != nullptr) { this->fan_speed_min_number_->publish_state(val); }
          }
        }
        else if (variable == VX_VARIABLE_STATUS) {
@@ -690,7 +715,12 @@ namespace esphome {
            if (value == 0x09) { this->fault_condition_text_sensor_->publish_state("danger of the water coil freezing"); }
            if (value == 0x0a) { this->fault_condition_text_sensor_->publish_state("outgoing air sensor fault");         }
          }
-
+       }
+       else if (variable == VX_VARIABLE_FAN_SPEED_MAX) {
+         val = hex2FanSpeed(value);
+         if (val!=NOT_SET) {
+           if (this->fan_speed_max_number_ != nullptr) { this->fan_speed_max_number_->publish_state(val); }
+         }
        } else {
          // variable not recognized
        }

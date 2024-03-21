@@ -50,9 +50,15 @@ climate:
     # sensor for current fan speed (is also visible as custom fan mode in climate component)
     fan_speed:
       name: vallox fan speed
-    # default fan speed (minimum fan speed)
+    # ** DEPRECATED, use fan_speed_min number instead, keeping for backwards compatibility now **  default fan speed (minimum fan speed)
     fan_speed_default:
       name: vallox fan speed default
+    # Maximum fan speed (control / number)
+    fan_speed_max:
+      name: vallox fan speed max
+    # Minimum/Default fan speed (control / number) (same value as fan_speed_default but with control)
+    fan_speed_min:
+      name: vallox fan speed min
     # temperature target, basically not used in my scenario other than having an indication for Home Assistant automations what temperature I would like to have (separate logic could be used with hystereses to heat/cool based on inside temperature and outside temperature)
     temperature_target:
       name: vallox temperature target
