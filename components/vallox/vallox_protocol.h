@@ -2,7 +2,6 @@
 // variables
 #define VX_VARIABLE_STATUS 0xA3
 #define VX_VARIABLE_FAN_SPEED 0x29
-#define VX_VARIABLE_DEFAULT_FAN_SPEED 0xA9
 #define VX_VARIABLE_RH1 0x2F
 #define VX_VARIABLE_RH2 0x30
 #define VX_VARIABLE_SERVICE_PERIOD 0xA6
@@ -18,6 +17,8 @@
 #define VX_VARIABLE_HEATING_STATUS 0x07 // TODO: Not yet implemented
 #define VX_VARIABLE_PROGRAM 0xAA
 #define VX_VARIABLE_T_HEAT_BYPASS 0xAF
+#define VX_VARIABLE_FAN_SPEED_MAX 0xA5
+#define VX_VARIABLE_FAN_SPEED_MIN 0xA9
 
 // Order of these two seems to be that the panel first queries for LO and then HI
 // Query interval is something like 5s by the panel..

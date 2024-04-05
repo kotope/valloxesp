@@ -51,6 +51,8 @@ namespace esphome {
       class ValloxVentilationHeatBypassNum;
       class ValloxVentilationServiceResetBtn;
       class ValloxVentilationSwitchSelectSel;
+      class ValloxVentilationFanSpeedMaxNum;
+      class ValloxVentilationFanSpeedMinNum;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -89,6 +91,32 @@ namespace esphome {
       };
 
 /////////////////////////////////////////////////////////////////////////////////////////
+
+      class ValloxVentilationFanSpeedMaxNum : public number::Number, public Component {
+        public:
+         void set_vallox_parent(ValloxVentilation *parent) { this->parent_ = parent; }
+
+        protected:
+         void control(float value) override;
+
+         ValloxVentilation *parent_;
+      };
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+      class ValloxVentilationFanSpeedMinNum : public number::Number, public Component {
+        public:
+         void set_vallox_parent(ValloxVentilation *parent) { this->parent_ = parent; }
+
+        protected:
+         void control(float value) override;
+
+         ValloxVentilation *parent_;
+      };
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
+
 
       class ValloxVentilation : public Component, public climate::Climate, public uart::UARTDevice {
         public:
@@ -130,7 +158,9 @@ namespace esphome {
          void set_error_relay_binary_sensor(binary_sensor::BinarySensor *sensor)      { this->error_relay_binary_sensor_      = sensor; }
          void set_extra_func_binary_sensor(binary_sensor::BinarySensor *sensor)       { this->extra_func_binary_sensor_       = sensor; }
          // number controls
-         void set_heat_bypass_number(number::Number *number) { this->heat_bypass_number_ = number; }
+         void set_heat_bypass_number(number::Number *number)   { this->heat_bypass_number_ = number; }
+         void set_fan_speed_max_number(number::Number *number) { this->fan_speed_max_number_ = number; }
+         void set_fan_speed_min_number(number::Number *number) { this->fan_speed_min_number_ = number; }
          // button controls
          void set_service_reset_button(button::Button *button) { this->service_reset_button_ = button; }
          // select controls
@@ -199,6 +229,8 @@ namespace esphome {
          binary_sensor::BinarySensor *error_relay_binary_sensor_{nullptr};
          binary_sensor::BinarySensor *extra_func_binary_sensor_{nullptr};
          number::Number *heat_bypass_number_{nullptr};
+         number::Number *fan_speed_max_number_{nullptr};
+         number::Number *fan_speed_min_number_{nullptr};
          button::Button *service_reset_button_{nullptr};
          select::Select *switch_type_select_select_{nullptr};
 

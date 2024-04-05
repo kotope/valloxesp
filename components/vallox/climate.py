@@ -51,6 +51,8 @@ CONF_HEAT_BYPASS          = "heat_bypass"
 CONF_SERVICE_RESET        = "service_reset"
 CONF_FAULT_CONDITION      = "fault_condition"
 CONF_SWITCH_TYPE_SELECT   = "switch_type_select"
+CONF_FAN_SPEED_MAX        = "fan_speed_max"
+CONF_FAN_SPEED_MIN        = "fan_speed_min"
 
 # options for the switch type selector (also in vallox.cpp)
 SELECT_SWITCH_TYPE_BOOST     = "boost"
@@ -69,6 +71,8 @@ ValloxVentilation = vallox_ns.class_("ValloxVentilation", climate.Climate, cg.Co
 ValloxVentilationHeatBypassNum       = vallox_ns.class_("ValloxVentilationHeatBypassNum",       number.Number, cg.Component)
 ValloxVentilationServiceResetBtn     = vallox_ns.class_("ValloxVentilationServiceResetBtn",     button.Button, cg.Component)
 ValloxVentilationSwitchTypeSelectSel = vallox_ns.class_("ValloxVentilationSwitchTypeSelectSel", select.Select, cg.Component)
+ValloxVentilationFanSpeedMaxNum      = vallox_ns.class_("ValloxVentilationFanSpeedMaxNum",      number.Number, cg.Component)
+ValloxVentilationFanSpeedMinNum      = vallox_ns.class_("ValloxVentilationFanSpeedMinNum",      number.Number, cg.Component)
 
 CONFIG_SCHEMA = cv.All(
     climate.CLIMATE_SCHEMA.extend(
@@ -194,6 +198,14 @@ CONFIG_SCHEMA = cv.All(
               ValloxVentilationSwitchTypeSelectSel,
               entity_category=ENTITY_CATEGORY_CONFIG,
             ),
+            cv.Optional(CONF_FAN_SPEED_MAX): number.number_schema(
+              ValloxVentilationFanSpeedMaxNum,
+              entity_category=ENTITY_CATEGORY_CONFIG,
+            ),
+            cv.Optional(CONF_FAN_SPEED_MIN): number.number_schema(
+              ValloxVentilationFanSpeedMinNum,
+              entity_category=ENTITY_CATEGORY_CONFIG,
+            ),
         }
     )
     .extend(uart.UART_DEVICE_SCHEMA)
@@ -313,3 +325,25 @@ async def to_code(config):
     cg.add(var.set_switch_type_select_select(sel_switch_type_select_var))
     parent = await cg.get_variable(config[CONF_ID])
     cg.add(sel_switch_type_select_var.set_vallox_parent(parent))
+  if CONF_FAN_SPEED_MAX in config:
+    num_fan_speed_max_var = await number.new_number(
+      config[CONF_FAN_SPEED_MAX],
+      min_value=1,
+      max_value=8,
+      step=1
+    )
+    await cg.register_component(num_fan_speed_max_var, config[CONF_FAN_SPEED_MAX])
+    cg.add(var.set_fan_speed_max_number(num_fan_speed_max_var))
+    parent = await cg.get_variable(config[CONF_ID])
+    cg.add(num_fan_speed_max_var.set_vallox_parent(parent))
+  if CONF_FAN_SPEED_MIN in config:
+    num_fan_speed_min_var = await number.new_number(
+      config[CONF_FAN_SPEED_MIN],
+      min_value=1,
+      max_value=8,
+      step=1
+    )
+    await cg.register_component(num_fan_speed_min_var, config[CONF_FAN_SPEED_MIN])
+    cg.add(var.set_fan_speed_min_number(num_fan_speed_min_var))
+    parent = await cg.get_variable(config[CONF_ID])
+    cg.add(num_fan_speed_min_var.set_vallox_parent(parent))
