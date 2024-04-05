@@ -17,6 +17,7 @@ https://github.com/dirtyha/my-esp8266/tree/master/Vallox
 - Vallox Digit SE
 - Vallox Digit SE 2
 - Vallox ValloPlus 350 SE
+- Vallox ValloPlus SE 500
 
 # Home Assistant component (custom_components)
 Contained entities:
