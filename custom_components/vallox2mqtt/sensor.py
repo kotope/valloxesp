@@ -2,7 +2,6 @@
 import logging
 
 from homeassistant.helpers.entity import Entity
-from homeassistant.core import HomeAssistant, callback
 
 from . import DOMAIN, SIGNAL_STATE_UPDATED
 from homeassistant.helpers.dispatcher import (
@@ -11,17 +10,17 @@ from homeassistant.helpers.dispatcher import (
 )
 
 from .const import (NAME, VERSION, MANUFACTURER)
-from homeassistant.const import (TEMP_CELSIUS)
+from homeassistant.const import UnitOfTemperature
 
 _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass, entry, async_add_devices):
     """Setup sensor platform."""
     async_add_devices([
-      ValloxDigitAttributedSensor(hass, entry, "Outside Temperature", 'temp_outside', TEMP_CELSIUS, "mdi:thermometer"),
-      ValloxDigitAttributedSensor(hass, entry, "Inside Temperature", 'temp_inside', TEMP_CELSIUS, "mdi:thermometer"),
-      ValloxDigitAttributedSensor(hass, entry, "Incoming Temperature", 'temp_incoming', TEMP_CELSIUS, "mdi:thermometer"),
-      ValloxDigitAttributedSensor(hass, entry, "Exhaust Temperature", 'temp_exhaust', TEMP_CELSIUS, "mdi:thermometer"),
+      ValloxDigitAttributedSensor(hass, entry, "Outside Temperature", 'temp_outside', UnitOfTemperature.CELSIUS, "mdi:thermometer"),
+      ValloxDigitAttributedSensor(hass, entry, "Inside Temperature", 'temp_inside', UnitOfTemperature.CELSIUS, "mdi:thermometer"),
+      ValloxDigitAttributedSensor(hass, entry, "Incoming Temperature", 'temp_incoming', UnitOfTemperature.CELSIUS, "mdi:thermometer"),
+      ValloxDigitAttributedSensor(hass, entry, "Exhaust Temperature", 'temp_exhaust', UnitOfTemperature.CELSIUS, "mdi:thermometer"),
       ValloxDigitAttributedSensor(hass, entry, "RH 1", 'rh_1', "%", "mdi:water-percent"),
       ValloxDigitAttributedSensor(hass, entry, "RH 2", 'rh_2', "%", "mdi:water-percent"),
       ValloxDigitAttributedSensor(hass, entry, "Service Counter", 'service_counter', "Months"),

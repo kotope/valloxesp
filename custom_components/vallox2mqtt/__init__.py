@@ -9,7 +9,7 @@ from homeassistant.components.mqtt import (
     subscription)
 from homeassistant.components.mqtt.const import CONF_RETAIN
 from homeassistant.const import (
-    CONF_NAME, CONF_VALUE_TEMPLATE, TEMP_CELSIUS, ATTR_TEMPERATURE)
+    CONF_NAME, CONF_VALUE_TEMPLATE, ATTR_TEMPERATURE)
 from homeassistant.components.mqtt.climate import (
     CONF_TEMP_STATE_TOPIC, CONF_MODE_LIST)
 from .const import (DOMAIN, PLATFORMS)

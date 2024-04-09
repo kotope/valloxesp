@@ -1,6 +1,4 @@
 """Vallox2mqtt boost/fireplace switch"""
-from homeassistant.core import HomeAssistant, callback
-
 from homeassistant.helpers.entity import Entity
 from homeassistant.components import switch
 from homeassistant.components.switch import (
