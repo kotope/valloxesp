@@ -32,10 +32,6 @@ AVAILABLE_MODES = ["HEAT", "FAN"]
 
 _LOGGER = logging.getLogger(__name__)
 
-async def async_setup(hass, config):
-    """Config from yaml file"""
-    return True
-
 async def async_setup_entry(hass, entry):
     """Config entry setup"""
     if hass.data.get(DOMAIN) is None:
@@ -48,10 +44,8 @@ async def async_setup_entry(hass, entry):
     await hass.data[DOMAIN][entry.entry_id]._subscribe_topics()
 
     # setup platforms
-    for platform in PLATFORMS:
-        hass.async_add_job(
-            hass.config_entries.async_forward_entry_setup(entry, platform)
-        )
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
     return True
 
 async def async_unload_entry(hass, entry):
@@ -117,7 +111,7 @@ class Vallox2mqtt():
                     'msg_callback': msg_callback,
                     'qos': self._qos}
 
-        def message_received(msg):
+        async def message_received(msg):
             """A new MQTT message has been received."""
             topic = msg.topic
             payload = msg.payload
@@ -149,16 +143,14 @@ class Vallox2mqtt():
         await subscription.async_subscribe_topics(
             self._hass, self._sub_state)
 
-    def _publish_temperature(self):
+    async def _publish_temperature(self):
         """Set new target temperature."""
         if self._target_temperature is None:
             return
         unencoded = '{"heat_target":' + str(round(self._target_temperature * 2) / 2.0) + '}'
-        self._hass.async_create_task(
-          mqtt.async_publish(self._hass, self._command_topic, unencoded,
-                       self._qos, self._retain))
+        await mqtt.async_publish(self._hass, self._command_topic, unencoded, self._qos, self._retain)
 
-    def _publish_hvac_mode(self):
+    async def _publish_hvac_mode(self):
         """Set new hvac mode."""
         _LOGGER.debug(f"Publishing HVAC mode: {self._hvac_mode}")
 
@@ -166,19 +158,16 @@ class Vallox2mqtt():
             return
         payload = '{"mode":"' + self._hvac_mode + '"}'
         _LOGGER.debug(f"Payload= {payload}, mqtt={mqtt}")
-        self._hass.async_create_task(mqtt.async_publish(self._hass, self._command_topic, payload,
-            self._qos, self._retain))
+        await mqtt.async_publish(self._hass, self._command_topic, payload, self._qos, self._retain)
 
-    def _publish_fan_mode(self): 
+    async def _publish_fan_mode(self):
         """Set new fan mode."""
         if self._fan_mode is None:
             return
         payload = '{"speed":' + self._fan_mode + '}'
-        self._hass.async_create_task(mqtt.async_publish(self._hass, self._command_topic, payload,
-            self._qos, self._retain))
+        await mqtt.async_publish(self._hass, self._command_topic, payload, self._qos, self._retain)
 
-    def _publish_switch_on(self):
+    async def _publish_switch_on(self):
         """Set fireplace/boost switch on."""
         payload = '{"activate_switch": true}'
-        self._hass.async_create_task(mqtt.async_publish(self._hass, self._command_topic, payload,
-            self._qos, self._retain))
+        await mqtt.async_publish(self._hass, self._command_topic, payload, self._qos, self._retain)

@@ -2,6 +2,7 @@
 import logging
 
 from homeassistant.helpers.entity import Entity
+from homeassistant.core import HomeAssistant, callback
 
 from . import DOMAIN, SIGNAL_STATE_UPDATED
 from homeassistant.helpers.dispatcher import (
@@ -50,17 +51,14 @@ class ValloxDigitSensor(Entity):
             "manufacturer": MANUFACTURER
         }
 
-    async def update_data(self):
-        """Fetch new state data for the sensor.
-        This is the only method that should fetch new data for Home Assistant.
-        """
-        self.async_write_ha_state()
-
-    async def async_added_to_hass(self):
+    async def async_added_to_hass(self) -> None:
         """Handle being added to home assistant."""
         await super().async_added_to_hass()
         self.async_on_remove(
-            async_dispatcher_connect(self.hass, SIGNAL_STATE_UPDATED, self.update_data)
+            async_dispatcher_connect(
+              self.hass,
+              SIGNAL_STATE_UPDATED,
+              self.async_write_ha_state)
         )
 
 class ValloxDigitAttributedSensor(ValloxDigitSensor):

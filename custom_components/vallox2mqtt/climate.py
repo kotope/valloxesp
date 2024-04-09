@@ -3,6 +3,7 @@ import logging
 
 from homeassistant.const import TEMP_CELSIUS
 from homeassistant.helpers.entity import Entity
+from homeassistant.core import HomeAssistant, callback
 
 from homeassistant.const import (
     ATTR_TEMPERATURE
@@ -56,17 +57,14 @@ class ValloxDigitClimate(ClimateEntity):
         self._state = None
         self._config_entry = entry
 
-    async def update_data(self):
-        """Fetch new state data for the sensor.
-        This is the only method that should fetch new data for Home Assistant.
-        """
-        self.async_write_ha_state()
-
-    async def async_added_to_hass(self):
+    async def async_added_to_hass(self) -> None:
         """Handle being added to home assistant."""
         await super().async_added_to_hass()
         self.async_on_remove(
-            async_dispatcher_connect(self.hass, SIGNAL_STATE_UPDATED, self.update_data)
+            async_dispatcher_connect(
+              self.hass,
+              SIGNAL_STATE_UPDATED,
+              self.async_write_ha_state)
         )
 
     @property
@@ -157,21 +155,21 @@ class ValloxDigitClimate(ClimateEntity):
         if kwargs.get(ATTR_TEMPERATURE) is not None:
             # This is also be set via the mqtt callback
             self._vallox2mqtt._target_temperature = kwargs.get(ATTR_TEMPERATURE)
-        self._vallox2mqtt._publish_temperature()
+        await self._vallox2mqtt._publish_temperature()
         self.async_write_ha_state()
 
     async def async_set_fan_mode(self, fan_mode):
         """Set new fan mode."""
         if fan_mode is not None:
             self._vallox2mqtt._fan_mode = fan_mode.upper()
-            self._vallox2mqtt._publish_fan_mode()
+            await self._vallox2mqtt._publish_fan_mode()
             self.async_write_ha_state()
 
     async def async_set_hvac_mode(self, hvac_mode):
         """Set new operating mode."""
         if hvac_mode is not None:
             self._vallox2mqtt._hvac_mode = ha_to_me[hvac_mode]
-            self._vallox2mqtt._publish_hvac_mode()
+            await self._vallox2mqtt._publish_hvac_mode()
             self.async_write_ha_state()
 
 
