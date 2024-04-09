@@ -1,9 +1,8 @@
 """vallox2mqtt climate control"""
 import logging
 
-from homeassistant.const import TEMP_CELSIUS
+from homeassistant.const import UnitOfTemperature
 from homeassistant.helpers.entity import Entity
-from homeassistant.core import HomeAssistant, callback
 
 from homeassistant.const import (
     ATTR_TEMPERATURE
@@ -18,14 +17,13 @@ from homeassistant.helpers.dispatcher import (
 from .const import (NAME, VERSION, MANUFACTURER)
 
 from homeassistant.components.climate import (
-    ClimateEntity)
-from homeassistant.components.climate.const import (
-    SUPPORT_TARGET_TEMPERATURE,
-    SUPPORT_FAN_MODE,
-    HVAC_MODE_HEAT, HVAC_MODE_FAN_ONLY,
-    CURRENT_HVAC_OFF, CURRENT_HVAC_HEAT, CURRENT_HVAC_FAN)
+    ClimateEntity,
+    ClimateEntityFeature,
+    HVACMode,
+    HVACAction
+    )
 
-SUPPORT_FLAGS = SUPPORT_TARGET_TEMPERATURE | SUPPORT_FAN_MODE
+SUPPORT_FLAGS = ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.FAN_MODE
 TARGET_TEMPERATURE_STEP = 1
 ATTR_OUTSIDE_TEMP = 'outside'
 ATTR_INSIDE_TEMP = 'inside'
@@ -34,7 +32,7 @@ ATTR_INCOMING_TEMP = 'incoming'
 
 _LOGGER = logging.getLogger(__name__)
 
-ha_to_me = {HVAC_MODE_HEAT: 'HEAT', HVAC_MODE_FAN_ONLY: 'FAN'}
+ha_to_me = {HVACMode.HEAT: 'HEAT', HVACMode.FAN_ONLY: 'FAN'}
 me_to_ha = {v: k for k, v in ha_to_me.items()}
 
 def setup_platform(hass, config, add_entities, discovery_info=None):
@@ -95,7 +93,7 @@ class ValloxDigitClimate(ClimateEntity):
     @property
     def temperature_unit(self):
         """Return the unit of measurement."""
-        return TEMP_CELSIUS
+        return UnitOfTemperature.CELSIUS
 
     @property
     def target_temperature(self):
@@ -122,9 +120,9 @@ class ValloxDigitClimate(ClimateEntity):
     @property
     def hvac_action(self):
         if self._vallox2mqtt._hvac_mode == 'FAN':
-            return CURRENT_HVAC_FAN
+            return HVACAction.FAN
         if self._vallox2mqtt._hvac_mode == 'HEAT':
-            return CURRENT_HVAC_HEAT
+            return HVACAction.HEATING
 
     @property
     def available(self):
