@@ -112,6 +112,12 @@ namespace esphome {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+      void ValloxVentilationSwitchBtn::press_action() {
+        this->parent_->setFlags06Variable(VX_06_FIREPLACE_FLAG_ACTIVATE,true);
+      }
+
+/////////////////////////////////////////////////////////////////////////////////////////
+
       // set up everything on startup.. TBD
       void ValloxVentilation::setup() {
         requestVariable(VX_VARIABLE_STATUS);
@@ -185,6 +191,7 @@ namespace esphome {
 
         statusMutex = false; // Clear the status mutex (prevents possible deadlocks of status)
         programMutex = false;
+        flags06Mutex = false;
       }
 
 
@@ -214,6 +221,21 @@ namespace esphome {
           lastRetryLoop = millis();
         }
       }
+
+      void ValloxVentilation::setFlags06Variable(byte bitpos, bool value) {
+        // ensure buffer_flags06 variable is filled
+        requestVariable(VX_VARIABLE_FLAGS_06);
+        if (!flags06Mutex) {
+          flags06Mutex = true;
+          if (value) {
+            setVariable(VX_VARIABLE_FLAGS_06, buffer_flags06 | bitpos); // set bit to 1
+          } else {
+            setVariable(VX_VARIABLE_FLAGS_06, buffer_flags06 & (~bitpos)); // set bit to 0
+          }
+          lastRetryLoop = millis();
+          requestVariable(VX_VARIABLE_FLAGS_06);
+        }
+      } 
 
 
       // control requests from HA for climate settings
@@ -352,6 +374,7 @@ namespace esphome {
 
         // log button details
         if (this->service_reset_button_ != nullptr) { LOG_BUTTON("  ", "Button service reset", this->service_reset_button_); }
+        if (this->switch_button_        != nullptr) { LOG_BUTTON("  ", "Button switch",        this->switch_button_);        }
 
         // log select details
         if (this->switch_type_select_select_ != nullptr) { LOG_SELECT("  ", "Select switch type", this->switch_type_select_select_); }
@@ -531,10 +554,6 @@ namespace esphome {
 
 
      void ValloxVentilation::decodeProgram(byte program) {
-       // flags of programs variable
-
-       buffer_program = program;
-
        if (this->switch_type_text_sensor_ != nullptr) {
          this->switch_type_text_sensor_->publish_state( ((program & VX_PROGRAM_SWITCH_TYPE) != 0x00) ? SWITCH_TYPE_ACTION_BOOST : SWITCH_TYPE_ACTION_FIREPLACE );
        }
@@ -545,8 +564,8 @@ namespace esphome {
      }
 
      void ValloxVentilation::decodeFlags06(byte flags06) {
-       // flags of variable 06 (0x71)
        if (this->switch_active_binary_sensor_ != nullptr) { this->switch_active_binary_sensor_->publish_state( (flags06 & VX_06_FIREPLACE_FLAG_IS_ACTIVE) != 0x00 ) ; }
+       flags06Mutex = false;
      }
 
      void ValloxVentilation::decodeVariable08(byte variable08) {
@@ -677,7 +696,7 @@ namespace esphome {
          decodeVariable08(value);
        }
        else if (variable == VX_VARIABLE_FLAGS_06) {
-         buffer_06 = value;
+         buffer_flags06 = value;
          decodeFlags06(value);
        }
        else if (variable == VX_VARIABLE_SERVICE_PERIOD) {
