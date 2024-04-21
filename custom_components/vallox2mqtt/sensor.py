@@ -71,7 +71,7 @@ class ValloxDigitAttributedSensor(ValloxDigitSensor):
     @property
     def unique_id(self):
         """Return a unique ID to use for this entity."""
-        return f"{DOMAIN}_{self._attr_name}"
+        return f"{self._config_entry.unique_id}_{self._attr_name}"
 
     @property
     def name(self):

@@ -68,7 +68,7 @@ class ValloxDigitClimate(ClimateEntity):
     @property
     def unique_id(self):
         """Return a unique ID to use for this entity."""
-        return f"{DOMAIN}_climate"
+        return f"{self._config_entry.unique_id}_climate"
 
     @property
     def supported_features(self):

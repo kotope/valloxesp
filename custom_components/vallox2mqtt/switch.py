@@ -52,7 +52,7 @@ class ValloxDigitSwitch(SwitchEntity):
     @property
     def unique_id(self):
         """Return a unique ID to use for this entity."""
-        return f"{DOMAIN}_switch"
+        return f"{self._config_entry.unique_id}_switch"
 
     @property
     def should_poll(self):

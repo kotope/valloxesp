@@ -6,6 +6,7 @@
         "title": "Vallox2mqtt configuration",
         "data": {
           "name": "Friendly name",
+          "unique_id": "Device unique id",
           "state_topic": "Vallox MQTT state topic",
           "command_topic": "Vallox MQTT command topic",
           "temperature_state_topic": "Vallox MQTT temperature state topic"
@@ -17,7 +18,8 @@
     },
     "abort": {
       "single_instance_allowed": "Only a single configuration is allowed",
-      "mqtt_required": "MQTT is required for this integration."
+      "mqtt_required": "MQTT is required for this integration.",
+      "already_configured": "Device with the same unique id is already configured"
     }
   }
 }
