@@ -79,7 +79,7 @@ class ValloxDigitSwitch(SwitchEntity):
 
     async def async_turn_on(self, **kwargs):
         """Turn on switch."""
-        self._vallox2mqtt._publish_switch_on()
+        await self._vallox2mqtt._publish_switch_on()
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs):
