@@ -45,8 +45,10 @@ climate:
     # and use heating_mode to control the bypass status (when heating_mode is on the heat exchanger turns on too, it can't be individually controlled)
     # See ValloxVentilation::control function for details
 
-    # All sensors below are optional and can be added or left off, if you add a sensor, name is a required setting
-
+    # All sensors/controls below are optional and can be added or left off, if you add a sensor/control, name is a required setting
+    # activate selected switch type function (fireplace/boost)
+    switch:
+      name: vallox switch
     # sensor for current fan speed (is also visible as custom fan mode in climate component)
     fan_speed:
       name: vallox fan speed

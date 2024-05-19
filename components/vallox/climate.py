@@ -53,6 +53,7 @@ CONF_FAULT_CONDITION      = "fault_condition"
 CONF_SWITCH_TYPE_SELECT   = "switch_type_select"
 CONF_FAN_SPEED_MAX        = "fan_speed_max"
 CONF_FAN_SPEED_MIN        = "fan_speed_min"
+CONF_SWITCH               = "switch"
 
 # options for the switch type selector (also in vallox.cpp)
 SELECT_SWITCH_TYPE_BOOST     = "boost"
@@ -73,6 +74,7 @@ ValloxVentilationServiceResetBtn     = vallox_ns.class_("ValloxVentilationServic
 ValloxVentilationSwitchTypeSelectSel = vallox_ns.class_("ValloxVentilationSwitchTypeSelectSel", select.Select, cg.Component)
 ValloxVentilationFanSpeedMaxNum      = vallox_ns.class_("ValloxVentilationFanSpeedMaxNum",      number.Number, cg.Component)
 ValloxVentilationFanSpeedMinNum      = vallox_ns.class_("ValloxVentilationFanSpeedMinNum",      number.Number, cg.Component)
+ValloxVentilationSwitchBtn           = vallox_ns.class_("ValloxVentilationSwitchBtn",           button.Button, cg.Component)
 
 CONFIG_SCHEMA = cv.All(
     climate.CLIMATE_SCHEMA.extend(
@@ -206,6 +208,9 @@ CONFIG_SCHEMA = cv.All(
               ValloxVentilationFanSpeedMinNum,
               entity_category=ENTITY_CATEGORY_CONFIG,
             ),
+            cv.Optional(CONF_SWITCH): button.button_schema(
+              ValloxVentilationSwitchBtn,
+            ), 
         }
     )
     .extend(uart.UART_DEVICE_SCHEMA)
@@ -347,3 +352,9 @@ async def to_code(config):
     cg.add(var.set_fan_speed_min_number(num_fan_speed_min_var))
     parent = await cg.get_variable(config[CONF_ID])
     cg.add(num_fan_speed_min_var.set_vallox_parent(parent))
+  if CONF_SWITCH in config:
+    btn_switch_var = await button.new_button(config[CONF_SWITCH])
+    await cg.register_component(btn_switch_var, config[CONF_SWITCH])
+    cg.add(var.set_switch_button(btn_switch_var))
+    parent = await cg.get_variable(config[CONF_ID])
+    cg.add(btn_switch_var.set_vallox_parent(parent))

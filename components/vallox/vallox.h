@@ -21,7 +21,7 @@
 #define VX_MSG_DOMAIN 0x01
 #define VX_MSG_POLL_BYTE 0x00
 #define NOT_SET -999
-#define QUERY_INTERVAL 300000 // in ms (5min)
+#define QUERY_INTERVAL 300000 // in ms (5 min)
 #define RETRY_INTERVAL 5000 // in ms (5 sec)
 #define VX_MAX_RETRIES 10
 #define VX_REPLY_WAIT_TIME 10
@@ -53,6 +53,7 @@ namespace esphome {
       class ValloxVentilationSwitchSelectSel;
       class ValloxVentilationFanSpeedMaxNum;
       class ValloxVentilationFanSpeedMinNum;
+      class ValloxVentilationSwitchBtn;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -116,6 +117,17 @@ namespace esphome {
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
+      class ValloxVentilationSwitchBtn : public button::Button, public Component {
+        public:
+         void set_vallox_parent(ValloxVentilation *parent) { this->parent_ = parent; }
+
+        protected:
+         void press_action() override;
+
+         ValloxVentilation *parent_;
+      };
+
+/////////////////////////////////////////////////////////////////////////////////////////
 
 
       class ValloxVentilation : public Component, public climate::Climate, public uart::UARTDevice {
@@ -163,6 +175,7 @@ namespace esphome {
          void set_fan_speed_min_number(number::Number *number) { this->fan_speed_min_number_ = number; }
          // button controls
          void set_service_reset_button(button::Button *button) { this->service_reset_button_ = button; }
+         void set_switch_button(button::Button *button)        { this->switch_button_        = button; }
          // select controls
          void set_switch_type_select_select(select::Select *select) { this->switch_type_select_select_ = select; }
 
@@ -171,6 +184,7 @@ namespace esphome {
          static byte cel2Ntc(int cel);
          void setVariable(byte variable, byte value);
          void setProgramVariable(byte bitpos, bool value);
+         void setFlags06Variable(byte bitpos, bool value);
          void requestVariable(byte variable);
          int service_period = 1; // set to 1 month to make any issue more obvious
 
@@ -178,6 +192,7 @@ namespace esphome {
          // lock status (prevent sending and overriding different values until we have received the last)
          boolean statusMutex = false;
          boolean programMutex = false;
+         boolean flags06Mutex = false;
          unsigned long lastRetryLoop = 0;
          unsigned long lastRequested = 0;
 
@@ -232,11 +247,12 @@ namespace esphome {
          number::Number *fan_speed_max_number_{nullptr};
          number::Number *fan_speed_min_number_{nullptr};
          button::Button *service_reset_button_{nullptr};
+         button::Button *switch_button_{nullptr};
          select::Select *switch_type_select_select_{nullptr};
 
          byte buffer_status = 0x00;
          byte target_status = 0x00;
-         byte buffer_06 = 0x00;
+         byte buffer_flags06 = 0x00;
          byte buffer_program = 0x00;
 
          byte buffer_co2_hi = 0x00;
