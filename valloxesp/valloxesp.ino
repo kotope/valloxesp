@@ -187,6 +187,10 @@ void publishState() {
   root["service_needed"] = vx.isServiceNeeded();
   
   root["summer_mode"] = vx.isSummerMode();
+  if (vx.getReadOnlyValue(VX_VARIABLE_IO_08) != NOT_SET)
+    root["error_relay"] = (bool)vx.getReadOnlyValue(VX_VARIABLE_IO_08);
+  if (vx.getReadOnlyValue(VX_VARIABLE_STATUS) != NOT_SET)
+    root["filter_warning"] = (bool)vx.getReadOnlyValue(VX_VARIABLE_STATUS);
   root["motor_in"] = !vx.isMotorIn();
   root["motor_out"] = !vx.isMotorOut();
   root["front_heating"] = vx.isFrontHeating();
@@ -197,6 +201,26 @@ void publishState() {
   root["service_period"] = vx.getServicePeriod();
   root["service_counter"] = vx.getServiceCounter();
   root["heat_target"] = vx.getHeatingTarget();  
+
+  // Additional read-only registers: omit values not received/decoded yet.
+  const byte registers[] = {
+    VX_VARIABLE_FAULT_CODE, VX_EXTRA_FUNC_COUNTER, VX_VARIABLE_POST_HEATING_TARGET,
+    VX_VARIABLE_BYPASS_SETPOINT, VX_VARIABLE_PREHEAT_SETPOINT,
+    VX_VARIABLE_DEFROST_SETPOINT, VX_VARIABLE_DEFROST_HYSTERESIS,
+    VX_VARIABLE_MAX_FAN_SPEED
+  };
+  const char* keys[] = {
+    "fault_code", "boost_remaining", "post_heating_target", "bypass_setpoint",
+    "preheat_setpoint", "defrost_setpoint", "defrost_hysteresis_raw", "max_fan_speed"
+  };
+  for (size_t i = 0; i < sizeof(registers) / sizeof(registers[0]); ++i) {
+    int value = vx.getReadOnlyValue(registers[i]);
+    if (value != NOT_SET) root[keys[i]] = value;
+  }
+  int hysteresis = vx.getReadOnlyValue(VX_VARIABLE_DEFROST_HYSTERESIS);
+  if (hysteresis != NOT_SET) root["defrost_hysteresis"] = hysteresis / 3.0;
+  int cellFreeze = vx.getReadOnlyValue(VX_VARIABLE_ALARM_FLAGS);
+  if (cellFreeze != NOT_SET) root["cell_freeze_alarm"] = (bool)cellFreeze;
 
   root["switch_active"] = vx.isSwitchActive();
 

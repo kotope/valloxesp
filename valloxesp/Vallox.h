@@ -13,11 +13,17 @@
 #define NOT_SET -999
 #define QUERY_INTERVAL 300000 // in ms (5min)
 #define RETRY_INTERVAL 5000 // in ms (5 sec)
+#define LIVE_QUERY_INTERVAL 60000 // in ms (1 min)
 #define REQUEST_GAP 100 // minimum time between poll frames, in ms
+#define REQUEST_QUEUE_LENGTH 24
+#define EXTRA_REGISTER_COUNT 9
+#define REQUEST_TIMEOUT 2000 // ms to wait for a poll reply before freeing the slot
 #define STATUS_LOCK_TIMEOUT 5000 // allows one in-flight poll plus the status poll
 #define WRITE_REPLY_WAIT_MS 300 // treat an outstanding poll as blocking writes for this long
 #define WRITE_HOLD_MS 2500 // max wait for bus idle before failing a queued write
 #define WRITE_QUEUE_LENGTH 6
+#define EXTRA_MAX_MISSES 3 // consecutive unanswered polls before backing off
+#define EXTRA_BACKOFF_INTERVAL 3600000UL // probe unanswered registers hourly
 
 // Cache fields updated only after a write is actually transmitted
 enum WriteKind : byte {
@@ -119,6 +125,8 @@ class Vallox {
     int getServicePeriod();
     int getServiceCounter();
     int getHeatingTarget();
+    // Read-only registers; NOT_SET until decoded (also supports A3 b4 / 08 b2).
+    int getReadOnlyValue(byte variable);
 
     // get data from cache (settings)
     int getSwitchType(); // (0 = fireplace, 1 = boost, NOT_SET = null)
@@ -158,6 +166,10 @@ class Vallox {
 
     unsigned long lastRequested = 0;
     unsigned long lastRetryLoop = 0;
+    unsigned long lastLiveRequested = 0;
+    bool extraPollingStarted = false;
+    byte requestQueue[REQUEST_QUEUE_LENGTH] = {};
+    byte requestCount = 0;
     byte pendingRequest = 0;
     unsigned long requestSentAt = 0;
     unsigned long statusMutexAt = 0;
@@ -166,6 +178,12 @@ class Vallox {
     byte writeCount = 0;
     byte receiveBuffer[VX_MSG_LENGTH] = {};
     byte receiveCount = 0;
+    byte extraMisses[EXTRA_REGISTER_COUNT] = {};
+    unsigned long extraBackoffAt[EXTRA_REGISTER_COUNT] = {};
+    int extraValues[EXTRA_REGISTER_COUNT] = {
+      NOT_SET, NOT_SET, NOT_SET, NOT_SET, NOT_SET,
+      NOT_SET, NOT_SET, NOT_SET, NOT_SET
+    };
 
     // lock status (prevent sending and overriding different values until we have received the last)
     boolean statusMutex = false;
@@ -275,6 +293,12 @@ class Vallox {
 
     // generic request
     void requestVariable(byte variable);
+    void processRequestQueue();
+    int extraIndex(byte variable);
+    void noteRequestTimeout(byte variable, unsigned long now);
+    boolean isBackedOff(byte variable, unsigned long now);
+    void requestLiveRegisters();
+    void requestSettingRegisters();
 
     // conversions
     static byte fanSpeed2Hex(int fan);

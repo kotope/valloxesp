@@ -4,6 +4,15 @@
 
 #include "Vallox.h"
 
+// First four are live values; the remaining five are diagnostic settings.
+const byte extraRegisters[EXTRA_REGISTER_COUNT] = {
+  VX_VARIABLE_FAULT_CODE, VX_EXTRA_FUNC_COUNTER,
+  VX_VARIABLE_POST_HEATING_TARGET, VX_VARIABLE_ALARM_FLAGS,
+  VX_VARIABLE_BYPASS_SETPOINT, VX_VARIABLE_PREHEAT_SETPOINT,
+  VX_VARIABLE_DEFROST_SETPOINT, VX_VARIABLE_DEFROST_HYSTERESIS,
+  VX_VARIABLE_MAX_FAN_SPEED
+};
+
 // VX fan speed (1-8) conversion table
 const uint8_t vxFanSpeeds[] = {
   VX_FAN_SPEED_1,
@@ -103,12 +112,23 @@ void Vallox::loop() {
 
   // query for data that can change without notice
   unsigned long now = millis();
+  if (isStatusInitDone() && !extraPollingStarted) {
+    extraPollingStarted = true;
+    lastLiveRequested = now;
+    requestLiveRegisters();
+    requestSettingRegisters();
+  }
+  if (extraPollingStarted && now - lastLiveRequested >= LIVE_QUERY_INTERVAL) {
+    lastLiveRequested = now;
+    requestLiveRegisters();
+  }
   if (now - lastRequested > QUERY_INTERVAL) {
     lastRequested = now;
 
     if (isStatusInitDone()) {
       sendIO08Req();
       sendServiceCounterReq();
+      requestSettingRegisters();
     }
   }
 
@@ -125,10 +145,27 @@ void Vallox::loop() {
     retryLoop();
   }
   processWriteQueue();
+  processRequestQueue();
 }
 
+void Vallox::requestLiveRegisters() {
+  for (byte i = 0; i < 4; ++i) requestVariable(extraRegisters[i]);
+}
 
+void Vallox::requestSettingRegisters() {
+  for (byte i = 4; i < EXTRA_REGISTER_COUNT; ++i) requestVariable(extraRegisters[i]);
+}
 
+int Vallox::getReadOnlyValue(byte variable) {
+  if (variable == VX_VARIABLE_STATUS)
+    return data.status.lastReceived ? (int)data.is_filter.value : NOT_SET;
+  if (variable == VX_VARIABLE_IO_08)
+    return data.variable08.lastReceived ? (int)data.is_error.value : NOT_SET;
+  for (byte i = 0; i < EXTRA_REGISTER_COUNT; ++i) {
+    if (extraRegisters[i] == variable) return extraValues[i];
+  }
+  return NOT_SET;
+}
 
 // setters — cache and MQTT state update only after the frame is transmitted
 void Vallox::setFanSpeed(int speed) {
@@ -595,8 +632,67 @@ void Vallox::transmitVariable(byte variable, byte value, byte target) {
 }
 
 void Vallox::requestVariable(byte variable) {
+  // Deduplicate requests, including those already awaiting a reply.
+  if (pendingRequest == variable) return;
+  for (byte i = 0; i < requestCount; ++i) {
+    if (requestQueue[i] == variable) {
+      if (variable == VX_VARIABLE_STATUS) {
+        for (byte j = i; j > 0; --j) requestQueue[j] = requestQueue[j - 1];
+        requestQueue[0] = variable;
+      }
+      return;
+    }
+  }
+  if (requestCount < REQUEST_QUEUE_LENGTH) {
+    if (variable == VX_VARIABLE_STATUS) {
+      for (byte i = requestCount; i > 0; --i) requestQueue[i] = requestQueue[i - 1];
+      requestQueue[0] = variable;
+      ++requestCount;
+    } else requestQueue[requestCount++] = variable;
+  }
+}
+
+int Vallox::extraIndex(byte variable) {
+  for (byte i = 0; i < EXTRA_REGISTER_COUNT; ++i) {
+    if (extraRegisters[i] == variable) return i;
+  }
+  return -1;
+}
+
+void Vallox::noteRequestTimeout(byte variable, unsigned long now) {
+  int i = extraIndex(variable);
+  if (i < 0) return; // core registers keep their existing retry behaviour
+  if (extraMisses[i] < 255) ++extraMisses[i];
+  if (extraMisses[i] >= EXTRA_MAX_MISSES) extraBackoffAt[i] = now;
+}
+
+boolean Vallox::isBackedOff(byte variable, unsigned long now) {
+  int i = extraIndex(variable);
+  if (i < 0 || extraMisses[i] < EXTRA_MAX_MISSES) return false;
+  // Unanswered N times in a row: probe only once per backoff period.
+  if (now - extraBackoffAt[i] < EXTRA_BACKOFF_INTERVAL) return true;
+  extraBackoffAt[i] = now;
+  return false;
+}
+
+void Vallox::processRequestQueue() {
+  unsigned long now = millis();
+  // A missing response releases the slot after the existing retry interval.
+  // Optional registers retry on their normal 60 s / 5 min schedule.
+  if (pendingRequest && now - requestSentAt < REQUEST_TIMEOUT) return;
+  if (pendingRequest) {
+    // Timed out: count consecutive misses for optional registers.
+    noteRequestTimeout(pendingRequest, now);
+    pendingRequest = 0;
+  }
+  if (writeCount || !requestCount || receiveCount || serial->available() ||
+      now - lastBusActivity < REQUEST_GAP || now - requestSentAt < REQUEST_GAP) return;
+  byte variable = requestQueue[0];
+  for (byte i = 1; i < requestCount; ++i) requestQueue[i - 1] = requestQueue[i];
+  --requestCount;
+  if (isBackedOff(variable, now)) return; // skip unanswered register for now
   pendingRequest = variable;
-  requestSentAt = millis();
+  requestSentAt = now;
   byte message[VX_MSG_LENGTH];
   message[0] = VX_MSG_DOMAIN;
   message[1] = VX_MSG_THIS_PANEL;
@@ -616,12 +712,7 @@ void Vallox::requestVariable(byte variable) {
   }
 
   lastBusActivity = millis();
-  delay(100);
 }
-
-
-
-
 
 // tries to read one full message
 // returns true if a message was read, false otherwise
@@ -671,6 +762,27 @@ void Vallox::decodeMessage(const byte message[]) {
       message[2] == VX_MSG_THIS_PANEL && variable == pendingRequest) {
     pendingRequest = 0;
   }
+  for (byte i = 0; i < EXTRA_REGISTER_COUNT; ++i) {
+    if (extraRegisters[i] == variable) extraMisses[i] = 0; // answered: supported
+  }
+
+  for (byte i = 0; i < EXTRA_REGISTER_COUNT; ++i) {
+    if (variable != extraRegisters[i]) continue;
+    int decoded = value;
+    if (variable == VX_VARIABLE_POST_HEATING_TARGET ||
+        variable == VX_VARIABLE_BYPASS_SETPOINT ||
+        variable == VX_VARIABLE_PREHEAT_SETPOINT ||
+        variable == VX_VARIABLE_DEFROST_SETPOINT) {
+      decoded = ntc2Cel(value);
+    } else if (variable == VX_VARIABLE_MAX_FAN_SPEED) {
+      decoded = hex2FanSpeed(value);
+    } else if (variable == VX_VARIABLE_ALARM_FLAGS) {
+      decoded = (value & VX_CELL_FREEZE_ALARM) != 0;
+    }
+    checkStatusChange(&extraValues[i], decoded);
+    return;
+  }
+
   // Temperature (status object)
   if (variable == VX_VARIABLE_T_OUTSIDE) { // OUTSIDE
     checkValueChange(&(data.t_outside.value), ntc2Cel(value), &(data.t_outside.lastReceived));

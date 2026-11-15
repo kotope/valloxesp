@@ -32,6 +32,57 @@ Contained entities:
 * binary sensor: summer mode
 * sensor: service counter (how many months until you have to replace your filters)
 
+## Read-only extra registers
+
+These keys are added to the existing `vallox/state` JSON. Existing keys and
+payloads are unchanged. A key is omitted until its first valid response.
+Zero and false are valid received values.
+
+| MQTT key | Register / conversion |
+|---|---|
+| `fault_code` | 0x36, raw decimal |
+| `boost_remaining` | 0x79, raw minutes |
+| `post_heating_target` | 0x57, NTC table, °C |
+| `bypass_setpoint` | 0xAF, NTC table, °C |
+| `preheat_setpoint` | 0xA7, NTC table, °C |
+| `defrost_setpoint` | 0xA8, NTC table, °C |
+| `defrost_hysteresis_raw` | 0xB2, raw decimal |
+| `defrost_hysteresis` | 0xB2, raw / 3.0, K |
+| `max_fan_speed` | 0xA5, fan bitmask decoded to 1–8 |
+| `filter_warning` | 0xA3 bit 4 |
+| `error_relay` | 0x08 bit 2 |
+| `cell_freeze_alarm` | 0x6D bit 7 only |
+
+`fault_code` is the last reported code: zero or a stored code alone does not
+indicate a current alarm. Use the fault/error flags for current status.
+`post_heating_target` is the actual target register, distinct from the existing
+`heat_target` user setpoint.
+
+After status initialization, 0x36, 0x79, 0x57 and 0x6D are queued immediately
+and about every 60 seconds. The five diagnostic setting registers are queued
+after initialization and through the existing five-minute `QUERY_INTERVAL` path,
+alongside I/O flags and the service counter. All polling, including startup and
+missing-value retries, shares a single request queue: at most one poll is sent
+per loop iteration, without blocking delays and with at least 100 ms of observed
+bus idle between requests. A matching checksum-valid mainboard reply to this
+panel releases the outstanding request; otherwise it times out after two
+seconds. Unsupported optional registers retry on their next normal
+60-second/five-minute cycle and never block status initialization. Missing base
+values retry on the existing five-second retry path. Overlapping groups share
+the queue without bursts. After three missed replies, unsupported optional
+registers are probed only once an hour.
+
+State publishing continues to use MQTT `beginPublish` streaming; the 2048-byte
+JSON document accommodates the added fields without depending on PubSubClient's
+packet buffer size. There are no new bus writes or MQTT set commands. The new
+keys are ready to be picked up by MQTT auto-discovery.
+
+RH/CO₂ registers are not periodically polled; existing passive decoding is
+retained. Startup still issues the historical one-shot RH1 request for
+master-compatible boot behaviour; it is not retried if unanswered. Register
+0x6D bit 6 is ignored. The bypass setpoint does not command damper position,
+and maximum fan level enforcement may depend on the unit's maximum-limit mode.
+
 ## Command write queue
 
 Control writes use a small bounded queue (coalesce by register: newest value
