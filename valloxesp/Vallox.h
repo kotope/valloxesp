@@ -126,6 +126,11 @@ class Vallox {
 
     // Init is done completely and marked ready -> ready to send updates
     bool fullInitDone = false;
+    bool statusDirty = false;
+    bool temperatureDirty = false;
+    unsigned long lastBusActivity = 0;
+    byte receiveBuffer[VX_MSG_LENGTH] = {};
+    byte receiveCount = 0;
 
     unsigned long lastRequested = 0;
     unsigned long lastRetryLoop = 0;
@@ -186,14 +191,14 @@ class Vallox {
       intValue status; // full status message
       intValue variable08; // full 08 message
       intValue flags06; // full flags 06 message
-    } data;
+    } data = {};
 
     // Settings data cache
     struct { 
       booleanValue is_boost_setting; // boost (1) or fireplace (0)
      
       intValue program; // full program (0xAA) message
-    } settings;
+    } settings = {};
     
     PACKET_CALLBACK_SIGNATURE {nullptr};
     STATUS_CHANGED_CALLBACK_SIGNATURE {nullptr};

@@ -19,7 +19,7 @@
 #define JSON_BUFFER_LENGTH 2048
 #define DEBUG false // default value for debug
 
-#define VALLOXESP_VERSION "1.0.0" // this version
+#define VALLOXESP_VERSION "1.0.1" // this version
 
 // Callbacks
 void mqttCallback(char* topic, byte* payload, unsigned int payloadLength);
@@ -88,11 +88,13 @@ void wifiConnect() {
 
 void mqttConnect() {
   if (!!!client.connected()) {
-    int count = 20;
-    while (count-- > 0 && !!!client.connect(client_id, mqtt_username, mqtt_password)) {
-      delay(500);
-    }
-
+    static unsigned long lastAttempt = 0;
+    static bool attempted = false;
+    if (attempted && millis() - lastAttempt < 5000) return;
+    attempted = true;
+    lastAttempt = millis();
+    if (WiFi.status() != WL_CONNECTED || !client.connect(client_id, mqtt_username, mqtt_password)) return;
+    publishAllData();
     if (client.subscribe(vallox_set_topic)) {
       // OK
       if (debug) {
@@ -114,13 +116,13 @@ void publishAllData() {
 
 void mqttCallback(char* topic, byte * payload, unsigned int length) {
   if (strcmp (vallox_set_topic, topic) == 0) {
-    handleUpdate(payload);
+    handleUpdate(payload, length);
   }
 }
 
-void handleUpdate(byte * payload) {
+void handleUpdate(byte * payload, unsigned int length) {
   DynamicJsonDocument d(JSON_BUFFER_LENGTH);
-  DeserializationError error = deserializeJson(d, (char*)payload);
+  DeserializationError error = deserializeJson(d, (const char*)payload, length);
 
   if (error) {
     if (debug) {
@@ -129,13 +131,13 @@ void handleUpdate(byte * payload) {
     return;
   }
 
-  if (d.containsKey("DEBUG")) {
+  if (d["DEBUG"].is<bool>()) {
     boolean debg = d["DEBUG"];
     debug = debg;
     vx.setDebug(debug);
   }
 
-  if (d.containsKey("mode")) {
+  if (d["mode"].is<const char*>()) {
     String m = d["mode"];
 
     if (m == "FAN") {
@@ -158,25 +160,26 @@ void handleUpdate(byte * payload) {
   // If you wish to have such feature, feel free to implement :-)
 
   // Speed
-  if (d.containsKey("speed")) {
+  if (d["speed"].is<int>()) {
     int speed = d["speed"];
     vx.setFanSpeed(speed);
   }
 
   // Heat target
-  if (d.containsKey("heat_target")) {
+  if (d["heat_target"].is<float>() && d["heat_target"].as<float>() >= 10 && d["heat_target"].as<float>() <= 27) {
     int ht = d["heat_target"];
     vx.setHeatingTarget(ht);
   }
 
   // Activate boost/fireplace
-  if (d.containsKey("activate_switch")) {
+  if (d["activate_switch"].is<bool>() && d["activate_switch"].as<bool>()) {
     vx.setSwitchOn();
   }
 }
 
 // State
 void publishState() {
+  if (!vx.isInitOk()) return;
   DynamicJsonDocument root(JSON_BUFFER_LENGTH);
 
   // Mode
@@ -190,7 +193,6 @@ void publishState() {
   root["service_needed"] = vx.isServiceNeeded();
   
   root["summer_mode"] = vx.isSummerMode();
-  // root["error_relay"] = vx.isErrorRelay();
   root["motor_in"] = !vx.isMotorIn();
   root["motor_out"] = !vx.isMotorOut();
   root["front_heating"] = vx.isFrontHeating();
@@ -213,7 +215,7 @@ void publishState() {
   
   String mqttOutput;
   serializeJson(root, mqttOutput);
-  client.beginPublish(vallox_state_topic, mqttOutput.length(), true);
+  if (root.overflowed() || !client.beginPublish(vallox_state_topic, mqttOutput.length(), true)) return;
   client.print(mqttOutput);
   client.endPublish();
 }
@@ -221,10 +223,11 @@ void publishState() {
 void publishTemperatures() {
   DynamicJsonDocument root(JSON_BUFFER_LENGTH);
 
-  root["temp_outside"] = vx.getOutsideTemp();
-  root["temp_inside"] = vx.getInsideTemp();
-  root["temp_incoming"] = vx.getIncomingTemp();
-  root["temp_exhaust"] = vx.getExhaustTemp();
+  // Omit temperatures that have not been read yet (no -999 placeholders).
+  if (vx.getOutsideTemp() != NOT_SET) root["temp_outside"] = vx.getOutsideTemp();
+  if (vx.getInsideTemp() != NOT_SET) root["temp_inside"] = vx.getInsideTemp();
+  if (vx.getIncomingTemp() != NOT_SET) root["temp_incoming"] = vx.getIncomingTemp();
+  if (vx.getExhaustTemp() != NOT_SET) root["temp_exhaust"] = vx.getExhaustTemp();
 
   // Publish only if RH values are something else than not set
   if(vx.getRh1() != NOT_SET) {
@@ -241,7 +244,7 @@ void publishTemperatures() {
 
   String mqttOutput;
   serializeJson(root, mqttOutput);
-  client.beginPublish(vallox_temp_topic, mqttOutput.length(), true);
+  if (root.overflowed() || !client.beginPublish(vallox_temp_topic, mqttOutput.length(), true)) return;
   client.print(mqttOutput);
   client.endPublish();
 }

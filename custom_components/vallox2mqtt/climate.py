@@ -34,6 +34,7 @@ _LOGGER = logging.getLogger(__name__)
 
 ha_to_me = {HVACMode.HEAT: 'HEAT', HVACMode.FAN_ONLY: 'FAN'}
 me_to_ha = {v: k for k, v in ha_to_me.items()}
+me_to_ha['OFF'] = HVACMode.OFF
 
 def setup_platform(hass, config, add_entities, discovery_info=None):
     """Set up the sensor platform."""
@@ -119,20 +120,30 @@ class ValloxDigitClimate(ClimateEntity):
 
     @property
     def hvac_action(self):
+        if self._vallox2mqtt._hvac_mode == 'OFF':
+            return HVACAction.OFF
         if self._vallox2mqtt._hvac_mode == 'FAN':
             return HVACAction.FAN
         if self._vallox2mqtt._hvac_mode == 'HEAT':
-            return HVACAction.HEATING
+            return HVACAction.HEATING if self._vallox2mqtt._current_status else HVACAction.IDLE
 
     @property
     def available(self):
         """Flag to inform availability"""
-        return True
+        return self._vallox2mqtt._state is not None
 
     @property
     def hvac_mode(self):
         """Return current operation (heat, fan)"""
-        return me_to_ha[self._vallox2mqtt._hvac_mode]
+        return me_to_ha.get(self._vallox2mqtt._hvac_mode)
+
+    @property
+    def min_temp(self):
+        return 10
+
+    @property
+    def max_temp(self):
+        return 27
 
     @property
     def hvac_modes(self):

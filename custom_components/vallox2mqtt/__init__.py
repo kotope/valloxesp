@@ -4,29 +4,13 @@ import logging
 import json
 import asyncio
 
-from homeassistant.components.mqtt import (
-    CONF_STATE_TOPIC, CONF_COMMAND_TOPIC, CONF_QOS,
-    subscription)
-from homeassistant.components.mqtt.const import CONF_RETAIN
-from homeassistant.const import (
-    CONF_NAME, CONF_VALUE_TEMPLATE, ATTR_TEMPERATURE)
-from homeassistant.components.mqtt.climate import (
-    CONF_TEMP_STATE_TOPIC, CONF_MODE_LIST)
-from .const import (DOMAIN, PLATFORMS)
-from homeassistant import config_entries, core
-
+from homeassistant.components.mqtt.const import CONF_STATE_TOPIC, CONF_COMMAND_TOPIC
+from homeassistant.const import CONF_NAME
+from .const import DOMAIN, PLATFORMS
 import homeassistant.components.mqtt as mqtt
-from homeassistant.components.mqtt.subscription import (
-    async_prepare_subscribe_topics,
-    async_subscribe_topics,
-    async_unsubscribe_topics,
-)
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 
-from homeassistant.helpers.dispatcher import (
-    async_dispatcher_connect,
-    async_dispatcher_send,
-)
-
+CONF_TEMP_STATE_TOPIC = "temperature_state_topic"
 SIGNAL_STATE_UPDATED = f"{DOMAIN}.updated"
 AVAILABLE_MODES = ["HEAT", "FAN"]
 
@@ -60,14 +44,17 @@ async def async_unload_entry(hass, entry):
     )
     # Remove config entry from domain.
     if unload_ok:
-        hass.data[DOMAIN].pop(entry.entry_id)
+        coordinator = hass.data[DOMAIN].pop(entry.entry_id)
+        for unsubscribe in coordinator._subscriptions:
+            unsubscribe()
 
     return unload_ok
 
 async def async_reload_entry(hass, entry) -> bool:
     """Reload config entry."""
-    await async_unload_entry(hass, entry)
-    await async_setup_entry(hass, entry)
+    if not await async_unload_entry(hass, entry):
+        return False
+    return await async_setup_entry(hass, entry)
 
 
 class Vallox2mqtt():
@@ -80,7 +67,8 @@ class Vallox2mqtt():
         self._state_topic = config.get(CONF_STATE_TOPIC,'')
         self._temp_state_topic = config.get(CONF_TEMP_STATE_TOPIC,'')
         self._command_topic = config.get(CONF_COMMAND_TOPIC,'')
-        self._sub_state = None
+        self._subscriptions = []
+        self._topic_keys = {}
         self._qos = 0 # TODO: Take these from config
         self._retain = False
 
@@ -97,51 +85,52 @@ class Vallox2mqtt():
         self._current_status = False
         self._current_power = None
         self._fan_mode = None
-        self._state = True # on/off
-        self._switch_active = False # Fireplace/boost
+        self._state = None # Unknown until the first state packet
+        self._switch_active = None # Fireplace/boost
 
     async def _subscribe_topics(self):
         """(Re)Subscribe to topics."""
-        topics = {}
-
-        def add_subscription(topics, topic, msg_callback):
-            if topic is not None:
-                topics[topic] = {
-                    'topic': topic,
-                    'msg_callback': msg_callback,
-                    'qos': self._qos}
-
         async def message_received(msg):
             """A new MQTT message has been received."""
             topic = msg.topic
             payload = msg.payload
-            parsed = json.loads(payload)
-            if topic == self._state_topic:
-                self._target_temperature = float(parsed['heat_target'])
-                self._fan_mode = str(parsed['speed'])
-                self._hvac_mode = parsed['mode']
-                self._current_power = bool(parsed['on'])
-                self._current_status = bool(parsed['heating'])
-                self._switch_active = bool(parsed['switch_active'])
-                self._attrs.update(parsed)
-                if parsed['mode'] == "OFF":
-                    self._state = False
+            try:
+                parsed = json.loads(payload)
+                if not isinstance(parsed, dict):
+                    return
+                if topic == self._state_topic:
+                    # Validate before changing any coordinator state.
+                    target = parsed.get('heat_target')
+                    target = float(target) if target is not None and float(target) > -999 else None
+                    mode = parsed.get('mode')
+                    if mode not in ('OFF', 'HEAT', 'FAN'):
+                        return
+                    self._target_temperature = target
+                    self._fan_mode = str(parsed['speed']) if parsed.get('speed') in range(1, 9) else None
+                    self._hvac_mode = mode
+                    self._current_power = parsed.get('on')
+                    self._current_status = parsed.get('heating')
+                    self._switch_active = parsed.get('switch_active')
+                    self._state = mode != 'OFF'
+                elif topic == self._temp_state_topic:
+                    incoming = parsed.get('temp_incoming')
+                    self._current_temperature = float(incoming) if incoming is not None and float(incoming) > -999 else None
                 else:
-                    self._state = True
-
-            elif topic == self._temp_state_topic:
-                self._current_temperature = float(parsed['temp_incoming'])
-                self._attrs.update(parsed)
-            else:
-                print("unknown topic") # TODO: Log as error
+                    return
+            except (ValueError, TypeError):
+                _LOGGER.warning("Ignoring invalid Vallox MQTT payload")
+                return
+            # Each topic is a snapshot; omitted optional keys must not stay stale.
+            for key in self._topic_keys.get(topic, set()):
+                self._attrs.pop(key, None)
+            self._topic_keys[topic] = set(parsed)
+            self._attrs.update(parsed)
             async_dispatcher_send(self._hass, SIGNAL_STATE_UPDATED)
 
-        for topic in [self._state_topic, self._temp_state_topic]:
-            add_subscription(topics, topic, message_received)
-
-        self._sub_state = async_prepare_subscribe_topics(self._hass, self._sub_state, topics)
-        await subscription.async_subscribe_topics(
-            self._hass, self._sub_state)
+        for topic in (self._state_topic, self._temp_state_topic):
+            self._subscriptions.append(
+                await mqtt.async_subscribe(self._hass, topic, message_received, self._qos)
+            )
 
     async def _publish_temperature(self):
         """Set new target temperature."""
