@@ -32,6 +32,18 @@ Contained entities:
 * binary sensor: summer mode
 * sensor: service counter (how many months until you have to replace your filters)
 
+## Command write queue
+
+Control writes use a small bounded queue (coalesce by register: newest value
+wins, original deadline kept; FIFO across different registers). A write is only
+transmitted when the bus is idle; it waits up to 2.5 s, then fails with a
+`vallox/command_result` message (`CMD_RESULT failed …`). Values are published to
+MQTT only after the frame is actually sent. Boost/fireplace activation is not
+re-queued while already active, and repeated activates coalesce to one pulse.
+Status writes require a previously received status byte and a fresh read after
+confirmation (or timeout). Selecting FAN or HEAT combines power-on and heating
+mode in one status write.
+
 # Configuration
 See guide at https://www.creatingsmarthome.com/?p=105
 

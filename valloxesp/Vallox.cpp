@@ -97,7 +97,6 @@ void Vallox::loop() {
     // Inform with callback about message
     decodeMessage(message);
   }
-
   if (statusDirty && fullInitDone && statusChangedCallback) statusChangedCallback();
   if (temperatureDirty && isTemperatureInitDone() && temperatureChangedCallback) temperatureChangedCallback();
   statusDirty = temperatureDirty = false;
@@ -113,131 +112,122 @@ void Vallox::loop() {
     }
   }
 
+  // Fallback if no status reply arrives: release the lock after a short
+  // timeout instead of waiting for the 5 s retry loop.
+  if (statusMutex && statusAwaitingConfirm && now - statusMutexAt > STATUS_LOCK_TIMEOUT) {
+    statusAwaitingConfirm = false;
+    statusMutex = false;
+    data.status.lastReceived = 0; // Require a fresh read before another RMW write.
+    sendStatusReq();
+  }
   if (now - lastRetryLoop > RETRY_INTERVAL) {
     lastRetryLoop = now;
     retryLoop();
   }
+  processWriteQueue();
 }
 
-// setters
-// these will set data both in the bus and cache
+
+
+
+// setters — cache and MQTT state update only after the frame is transmitted
 void Vallox::setFanSpeed(int speed) {
   if (speed >= VX_MIN_FAN_SPEED && speed <= VX_MAX_FAN_SPEED) {
-    setVariable(VX_VARIABLE_FAN_SPEED, fanSpeed2Hex(speed));
-    data.fan_speed.value = speed;
-    statusChangedCallback();
+    scheduleWrite(VX_VARIABLE_FAN_SPEED, fanSpeed2Hex(speed), VX_MSG_MAINBOARDS,
+                  WK_FAN_SPEED, speed);
   }
 }
 
 void Vallox::setDefaultFanSpeed(int speed) {
   if (speed >= VX_MIN_FAN_SPEED && speed <= VX_MAX_FAN_SPEED) {
-    setVariable(VX_VARIABLE_DEFAULT_FAN_SPEED, fanSpeed2Hex(speed));
-    data.default_fan_speed.value = speed;
-    statusChangedCallback();
+    scheduleWrite(VX_VARIABLE_DEFAULT_FAN_SPEED, fanSpeed2Hex(speed), VX_MSG_MAINBOARDS,
+                  WK_DEFAULT_FAN_SPEED, speed);
   }
 }
 
-// Status variables
 void Vallox::setOn() {
-
-  if (setStatusVariable(VX_VARIABLE_STATUS, data.status.value | VX_STATUS_FLAG_POWER)) {
-    data.is_on.value = true;
-    statusChangedCallback();
-  }
+  setStatusVariable(VX_VARIABLE_STATUS, data.status.value | VX_STATUS_FLAG_POWER);
 }
 
 void Vallox::setOff() {
-  if (setStatusVariable(VX_VARIABLE_STATUS, data.status.value & ~VX_STATUS_FLAG_POWER)) {
-    data.is_on.value = false;
-    statusChangedCallback();
-  }
+  setStatusVariable(VX_VARIABLE_STATUS, data.status.value & ~VX_STATUS_FLAG_POWER);
 }
 
 void Vallox::setRhModeOn() {
-  if (setStatusVariable(VX_VARIABLE_STATUS, data.status.value | VX_STATUS_FLAG_RH)) {
-    data.is_rh_mode.value = true;
-    statusChangedCallback();
-  }
+  setStatusVariable(VX_VARIABLE_STATUS, data.status.value | VX_STATUS_FLAG_RH);
 }
 
 void Vallox::setRhModeOff() {
-  if (setStatusVariable(VX_VARIABLE_STATUS, data.status.value & ~VX_STATUS_FLAG_RH)) {
-    data.is_rh_mode.value = false;
-    statusChangedCallback();
-  }
+  setStatusVariable(VX_VARIABLE_STATUS, data.status.value & ~VX_STATUS_FLAG_RH);
 }
 
 void Vallox::setHeatingModeOn() {
   // Don't set if already active. Vallox seems to reset to default speed if same mode is set twice
-  if (data.status.value & VX_STATUS_FLAG_HEATING_MODE) {
-    debugPrintCallback("Heating mode is already on!");
-    statusChangedCallback();
-  }
-  else if (setStatusVariable(VX_VARIABLE_STATUS, data.status.value | VX_STATUS_FLAG_HEATING_MODE)) {
-    data.is_heating_mode.value = true;
-    statusChangedCallback();
+  if ((data.status.value & VX_STATUS_FLAG_HEATING_MODE) && isOn()) {
+    if (debugPrintCallback) debugPrintCallback("Heating mode is already on!");
+    if (statusChangedCallback) statusChangedCallback();
+  } else {
+    setStatusVariable(VX_VARIABLE_STATUS,
+                      data.status.value | VX_STATUS_FLAG_HEATING_MODE | VX_STATUS_FLAG_POWER);
   }
 }
 
 void Vallox::setHeatingModeOff() {
-  // Don't set if already active. Vallox seems to reset to default speed if same mode is set twice
-  if (!(data.status.value & VX_STATUS_FLAG_HEATING_MODE)) {
-    debugPrintCallback("Heating mode is already off!");
-    statusChangedCallback();
-  }
-  else if (setStatusVariable(VX_VARIABLE_STATUS, data.status.value & ~VX_STATUS_FLAG_HEATING_MODE)) {
-    data.is_heating_mode.value = false;
-    statusChangedCallback();
+  if (!(data.status.value & VX_STATUS_FLAG_HEATING_MODE) && isOn()) {
+    if (debugPrintCallback) debugPrintCallback("Heating mode is already off!");
+    if (statusChangedCallback) statusChangedCallback();
+  } else {
+    setStatusVariable(VX_VARIABLE_STATUS,
+                      (data.status.value & ~VX_STATUS_FLAG_HEATING_MODE) | VX_STATUS_FLAG_POWER);
   }
 }
 
 boolean Vallox::setStatusVariable(byte variable, byte value) {
-  if (!statusMutex && data.status.lastReceived) {
-    statusMutex = true; // lock sending status again
-    // Status is only allowed to send to specific mainboard
-    setVariable(variable, value, VX_MSG_MAINBOARD_1);
-
-    // Clear the retry loop to prevent retry loops to break in before getting reply
-    lastRetryLoop = millis();
-    return true;
-  }
-
-  return false;
+  if (statusMutex || !data.status.lastReceived) return false;
+  // Mutex held from accept until confirmation (or timeout) so another RMW cannot interleave.
+  if (!scheduleWrite(variable, value, VX_MSG_MAINBOARD_1, WK_STATUS, value)) return false;
+  statusMutex = true;
+  statusMutexAt = millis();
+  lastRetryLoop = millis();
+  return true;
 }
 
 void Vallox::setServicePeriod(int months) {
   if (months >= 0 && months < 256) {
-    setVariable(VX_VARIABLE_SERVICE_PERIOD, months);
-    data.service_period.value = months;
-    statusChangedCallback();
+    scheduleWrite(VX_VARIABLE_SERVICE_PERIOD, months, VX_MSG_MAINBOARDS,
+                  WK_SERVICE_PERIOD, months);
   }
 }
 
 void Vallox::setServiceCounter(int months) {
   if (months >= 0 && months < 256) {
-    setVariable(VX_VARIABLE_SERVICE_COUNTER, months);
-    data.service_counter.value = months;
-    statusChangedCallback();
+    scheduleWrite(VX_VARIABLE_SERVICE_COUNTER, months, VX_MSG_MAINBOARDS,
+                  WK_SERVICE_COUNTER, months);
   }
 }
 
 void Vallox::setHeatingTarget(int cel) {
   if (cel >= 10 && cel <= 27) {
-    byte hex = cel2Ntc(cel);
-    setVariable(VX_VARIABLE_HEATING_TARGET, hex);
-    data.heating_target.value = cel;
-    statusChangedCallback();
+    scheduleWrite(VX_VARIABLE_HEATING_TARGET, cel2Ntc(cel), VX_MSG_MAINBOARDS,
+                  WK_HEATING_TARGET, cel);
   }
 }
 
 void Vallox::setSwitchOn() {
-  // Activate boost/fireplace
-  setVariable(VX_VARIABLE_FLAGS_06, data.flags06.value | VX_06_FIREPLACE_FLAG_ACTIVATE);
+  if (switchActivationPending ||
+      (data.is_switch_active.lastReceived && data.is_switch_active.value)) {
+    if (debugPrintCallback) debugPrintCallback("Boost/fireplace already active or pending");
+    return;
+  }
+  if (!data.flags06.lastReceived) { sendFlags06Req(); return; }
+  scheduleWrite(VX_VARIABLE_FLAGS_06,
+                data.flags06.value | VX_06_FIREPLACE_FLAG_ACTIVATE,
+                VX_MSG_MAINBOARDS, WK_SWITCH_ON, 1);
 }
 
 void Vallox::setDebug(bool debug) {
   isDebug = debug;
-  statusChangedCallback();
+  if (statusChangedCallback) statusChangedCallback();
 }
 
 boolean Vallox::isInitOk() {
@@ -442,11 +432,136 @@ void Vallox::sendRhReq() {
 }
 
 // set generic variable value in all mainboards and panels
-void Vallox::setVariable(byte variable, byte value) {
-  setVariable(variable, value, VX_MSG_MAINBOARDS);
+bool Vallox::setVariable(byte variable, byte value) {
+  return scheduleWrite(variable, value, VX_MSG_MAINBOARDS, WK_NONE, 0);
 }
 
-void Vallox::setVariable(byte variable, byte value, byte target) {
+bool Vallox::setVariable(byte variable, byte value, byte target) {
+  return scheduleWrite(variable, value, target, WK_NONE, 0);
+}
+
+boolean Vallox::isBusBusy() {
+  unsigned long now = millis();
+  return receiveCount || (serial && serial->available()) ||
+         now - lastBusActivity < REQUEST_GAP ||
+         (pendingRequest && now - requestSentAt < WRITE_REPLY_WAIT_MS);
+}
+
+void Vallox::publishCommandResult(const char *result, byte variable, const char *reason) {
+  if (!debugPrintCallback) return;
+  char buf[96];
+  snprintf(buf, sizeof(buf), "CMD_RESULT %s var=0x%02X %s", result, variable, reason ? reason : "");
+  debugPrintCallback(String(buf));
+}
+
+void Vallox::failWrite(const PendingWrite &cmd, const char *reason) {
+  publishCommandResult("failed", cmd.variable, reason);
+  if (cmd.kind == WK_STATUS) {
+    statusAwaitingConfirm = false;
+    statusMutex = false;
+    data.status.lastReceived = 0;
+    sendStatusReq();
+  }
+  if (cmd.kind == WK_SWITCH_ON) switchActivationPending = false;
+}
+
+void Vallox::applyWriteCache(const PendingWrite &cmd) {
+  switch (cmd.kind) {
+    case WK_FAN_SPEED: data.fan_speed.value = cmd.decoded; break;
+    case WK_DEFAULT_FAN_SPEED: data.default_fan_speed.value = cmd.decoded; break;
+    case WK_HEATING_TARGET: data.heating_target.value = cmd.decoded; break;
+    case WK_SERVICE_PERIOD: data.service_period.value = cmd.decoded; break;
+    case WK_SERVICE_COUNTER: data.service_counter.value = cmd.decoded; break;
+    case WK_STATUS:
+      data.is_on.value = (cmd.decoded & VX_STATUS_FLAG_POWER) != 0;
+      data.is_heating_mode.value = (cmd.decoded & VX_STATUS_FLAG_HEATING_MODE) != 0;
+      data.is_rh_mode.value = (cmd.decoded & VX_STATUS_FLAG_RH) != 0;
+      data.status.value = (byte)cmd.decoded;
+      statusAwaitingConfirm = true;
+      statusMutex = true;
+      statusMutexAt = millis();
+      requestVariable(VX_VARIABLE_STATUS);
+      break;
+    case WK_SWITCH_ON:
+      switchActivationPending = true;
+      break; // wait for flags06; block further activates until then
+    default: break;
+  }
+  if (cmd.kind != WK_NONE && cmd.kind != WK_SWITCH_ON && statusChangedCallback)
+    statusChangedCallback();
+}
+
+bool Vallox::scheduleWrite(byte variable, byte value, byte target, byte kind, int decoded) {
+  if (!serial) return false;
+
+  // Coalesce: newest value wins for the same setting; keep the original deadline.
+  for (byte i = 0; i < writeCount; ++i) {
+    if (writeQueue[i].variable == variable && writeQueue[i].target == target) {
+      // Boost/fireplace: do not turn one activation into two; just refresh bits.
+      writeQueue[i].value = value;
+      writeQueue[i].kind = kind;
+      writeQueue[i].decoded = decoded;
+      return true;
+    }
+  }
+
+  // Idle and nothing queued ahead → transmit now (no ordering inversion).
+  if (writeCount == 0 && !isBusBusy()) {
+    PendingWrite cmd = {};
+    cmd.active = true; cmd.variable = variable; cmd.value = value;
+    cmd.target = target; cmd.kind = kind; cmd.decoded = decoded; cmd.queuedAt = millis();
+    transmitVariable(variable, value, target);
+    applyWriteCache(cmd);
+    publishCommandResult("sent", variable, "immediate");
+    return true;
+  }
+
+  if (writeCount >= WRITE_QUEUE_LENGTH) {
+    PendingWrite rejected = {};
+    rejected.variable = variable; rejected.kind = kind;
+    failWrite(rejected, "overflow");
+    return false;
+  }
+
+  PendingWrite &slot = writeQueue[writeCount++];
+  slot.active = true;
+  slot.variable = variable;
+  slot.value = value;
+  slot.target = target;
+  slot.kind = kind;
+  slot.decoded = decoded;
+  slot.queuedAt = millis();
+  return true;
+}
+
+void Vallox::processWriteQueue() {
+  unsigned long now = millis();
+  // Expire head-of-line and any entries past the hold limit.
+  while (writeCount) {
+    if (now - writeQueue[0].queuedAt < WRITE_HOLD_MS) break;
+    PendingWrite expired = writeQueue[0];
+    for (byte i = 1; i < writeCount; ++i) writeQueue[i - 1] = writeQueue[i];
+    --writeCount;
+    failWrite(expired, "expired");
+  }
+  if (!writeCount || isBusBusy()) return;
+
+  PendingWrite cmd = writeQueue[0];
+  for (byte i = 1; i < writeCount; ++i) writeQueue[i - 1] = writeQueue[i];
+  --writeCount;
+  if (cmd.kind == WK_SWITCH_ON &&
+      data.is_switch_active.lastReceived && data.is_switch_active.value) {
+    switchActivationPending = false;
+    publishCommandResult("failed", cmd.variable, "already_active");
+    return;
+  }
+  transmitVariable(cmd.variable, cmd.value, cmd.target);
+  applyWriteCache(cmd);
+  publishCommandResult("sent", cmd.variable, "queued");
+}
+
+void Vallox::transmitVariable(byte variable, byte value, byte target) {
+
   byte message[VX_MSG_LENGTH];
   message[0] = VX_MSG_DOMAIN;
   message[1] = VX_MSG_THIS_PANEL;
@@ -465,6 +580,9 @@ void Vallox::setVariable(byte variable, byte value, byte target) {
     packetCallback(message, VX_MSG_LENGTH, (char*)"packetSent");
   }
 
+  // Do not fabricate a status acknowledgement that can release our own lock.
+  if (variable == VX_VARIABLE_STATUS) { lastBusActivity = millis(); return; }
+
   message[1] = VX_MSG_MAINBOARD_1;
   message[2] = VX_MSG_PANELS;
   message[5] = calculateCheckSum(message);
@@ -473,9 +591,12 @@ void Vallox::setVariable(byte variable, byte value, byte target) {
   for (int i = 0; i < VX_MSG_LENGTH; i++) {
     serial->write(message[i]);
   }
+  lastBusActivity = millis();
 }
 
 void Vallox::requestVariable(byte variable) {
+  pendingRequest = variable;
+  requestSentAt = millis();
   byte message[VX_MSG_LENGTH];
   message[0] = VX_MSG_DOMAIN;
   message[1] = VX_MSG_THIS_PANEL;
@@ -494,8 +615,13 @@ void Vallox::requestVariable(byte variable) {
     serial->write(message[i]);
   }
 
+  lastBusActivity = millis();
   delay(100);
 }
+
+
+
+
 
 // tries to read one full message
 // returns true if a message was read, false otherwise
@@ -534,12 +660,17 @@ void Vallox::decodeMessage(const byte message[]) {
     return ;// Message invalid
   }
 
-  // Preserve upstream panel/local-echo handling in this reliability layer.
-  if ((message[1] != VX_MSG_MAINBOARD_1 && message[1] != VX_MSG_THIS_PANEL && message[1] != VX_MSG_PANEL_1) ||
+  // Commands and local echoes are not confirmed mainboard state.
+  if (message[1] != VX_MSG_MAINBOARD_1 ||
       (message[2] != VX_MSG_PANELS && message[2] != VX_MSG_THIS_PANEL &&
-       message[2] != VX_MSG_PANEL_1 && message[2] != VX_MSG_MAINBOARD_1 &&
-       message[2] != VX_MSG_MAINBOARDS)) return;
+       message[2] != VX_MSG_PANEL_1)) return;
 
+  // Only a checksum-valid mainboard response addressed to this poller
+  // completes an outstanding poll. Other bus traffic still updates the cache.
+  if (message[1] == VX_MSG_MAINBOARD_1 &&
+      message[2] == VX_MSG_THIS_PANEL && variable == pendingRequest) {
+    pendingRequest = 0;
+  }
   // Temperature (status object)
   if (variable == VX_VARIABLE_T_OUTSIDE) { // OUTSIDE
     checkValueChange(&(data.t_outside.value), ntc2Cel(value), &(data.t_outside.lastReceived));
@@ -646,7 +777,16 @@ void Vallox::decodeFlags06(byte flags06) {
   data.flags06.value = flags06;
   data.flags06.lastReceived = now ? now : 1;
 
-  checkStatusChange(&(data.is_switch_active.value), (flags06 & VX_06_FIREPLACE_FLAG_IS_ACTIVE) != 0x00);
+  bool active = (flags06 & VX_06_FIREPLACE_FLAG_IS_ACTIVE) != 0x00;
+  checkStatusChange(&(data.is_switch_active.value), active);
+  if (active) {
+    switchActivationPending = false;
+    for (byte i = 0; i < writeCount; ++i) {
+      if (writeQueue[i].kind != WK_SWITCH_ON) continue;
+      for (byte j = i + 1; j < writeCount; ++j) writeQueue[j - 1] = writeQueue[j];
+      --writeCount; --i;
+    }
+  }
 }
 
 void Vallox::decodeProgram(byte program) {
@@ -689,7 +829,10 @@ void Vallox::decodeStatus(byte status) {
   checkStatusChange(&(data.is_fault.value), (status & VX_STATUS_FLAG_FAULT) != 0x00);
   checkStatusChange(&(data.is_service.value), (status & VX_STATUS_FLAG_SERVICE) != 0x00);
 
-  statusMutex = false; // Clear the status mutex, allow to continue
+  if (statusAwaitingConfirm) {
+    statusAwaitingConfirm = false;
+    statusMutex = false;
+  }
 }
 
 //
@@ -845,7 +988,6 @@ unsigned long Vallox::checkChange(int* oldValue, int newValue) {
 
 void Vallox::retryLoop() {
   sendMissingRequests();
-  statusMutex = false; // Clear the status mutex (prevents possible deadlocks of status)
 }
 
 void Vallox::sendMissingRequests() {
