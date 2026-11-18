@@ -13,6 +13,33 @@
 #define NOT_SET -999
 #define QUERY_INTERVAL 300000 // in ms (5min)
 #define RETRY_INTERVAL 5000 // in ms (5 sec)
+#define REQUEST_GAP 100 // minimum time between poll frames, in ms
+#define STATUS_LOCK_TIMEOUT 5000 // allows one in-flight poll plus the status poll
+#define WRITE_REPLY_WAIT_MS 300 // treat an outstanding poll as blocking writes for this long
+#define WRITE_HOLD_MS 2500 // max wait for bus idle before failing a queued write
+#define WRITE_QUEUE_LENGTH 6
+
+// Cache fields updated only after a write is actually transmitted
+enum WriteKind : byte {
+  WK_NONE = 0,
+  WK_FAN_SPEED,
+  WK_DEFAULT_FAN_SPEED,
+  WK_HEATING_TARGET,
+  WK_SERVICE_PERIOD,
+  WK_SERVICE_COUNTER,
+  WK_STATUS,
+  WK_SWITCH_ON
+};
+
+struct PendingWrite {
+  bool active;
+  byte variable;
+  byte value;
+  byte target;
+  byte kind;
+  int decoded;
+  unsigned long queuedAt; // original enqueue time; kept on coalesce
+};
 
 // senders and receivers
 #define VX_MSG_MAINBOARD_1 0x11
@@ -128,15 +155,22 @@ class Vallox {
     bool fullInitDone = false;
     bool statusDirty = false;
     bool temperatureDirty = false;
-    unsigned long lastBusActivity = 0;
-    byte receiveBuffer[VX_MSG_LENGTH] = {};
-    byte receiveCount = 0;
 
     unsigned long lastRequested = 0;
     unsigned long lastRetryLoop = 0;
+    byte pendingRequest = 0;
+    unsigned long requestSentAt = 0;
+    unsigned long statusMutexAt = 0;
+    unsigned long lastBusActivity = 0;
+    PendingWrite writeQueue[WRITE_QUEUE_LENGTH] = {};
+    byte writeCount = 0;
+    byte receiveBuffer[VX_MSG_LENGTH] = {};
+    byte receiveCount = 0;
 
     // lock status (prevent sending and overriding different values until we have received the last)
     boolean statusMutex = false;
+    boolean statusAwaitingConfirm = false;
+    boolean switchActivationPending = false;
 
     // lock program variable (prevent sending and overriding different values until we have received the last)
     boolean programMutex = false;
@@ -209,8 +243,15 @@ class Vallox {
     boolean setStatusVariable(byte variable, byte value);
 
     // generic setter
-    void setVariable(byte variable, byte value, byte target);
-    void setVariable(byte variable, byte value);
+    bool setVariable(byte variable, byte value, byte target);
+    bool setVariable(byte variable, byte value);
+    bool scheduleWrite(byte variable, byte value, byte target, byte kind, int decoded);
+    void transmitVariable(byte variable, byte value, byte target);
+    void applyWriteCache(const PendingWrite &cmd);
+    void failWrite(const PendingWrite &cmd, const char *reason);
+    void publishCommandResult(const char *result, byte variable, const char *reason);
+    boolean isBusBusy();
+    void processWriteQueue();
   
     // requests
     void sendStatusReq();

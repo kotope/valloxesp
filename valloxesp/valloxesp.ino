@@ -19,7 +19,7 @@
 #define JSON_BUFFER_LENGTH 2048
 #define DEBUG false // default value for debug
 
-#define VALLOXESP_VERSION "1.0.1" // this version
+#define VALLOXESP_VERSION "1.0.2" // this version
 
 // Callbacks
 void mqttCallback(char* topic, byte* payload, unsigned int payloadLength);
@@ -142,15 +142,9 @@ void handleUpdate(byte * payload, unsigned int length) {
 
     if (m == "FAN") {
       // Fan only
-      if (!vx.isOn()) {
-        vx.setOn();
-      }
       vx.setHeatingModeOff();
     } else if (m == "HEAT") {
       // Set heat mode
-      if (!vx.isOn()) {
-        vx.setOn();
-      }
       vx.setHeatingModeOn();
     }
    
@@ -258,8 +252,16 @@ void temperatureChanged() {
 }
 
 void debugPrint(String message) {
+  if (message.startsWith("CMD_RESULT ")) {
+    // Always publish command outcomes (sent / failed) for HA/logging.
+    DynamicJsonDocument root(192);
+    root["message"] = message;
+    String out; serializeJson(root, out);
+    client.beginPublish(vallox_command_result_topic, out.length(), false);
+    client.print(out);
+    client.endPublish();
+  }
   if (debug) {
-    // publish to debug topic
     client.publish(vallox_debug_topic, message.c_str());
   }
 }
